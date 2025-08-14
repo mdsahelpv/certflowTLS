@@ -248,6 +248,63 @@ export class X509Utils {
     return { notBefore: cert.validity.notBefore, notAfter: cert.validity.notAfter };
   }
 
+  // Validate X.509 extensions for compliance
+  static validateExtensions(extensions: any[], isCA: boolean): { isCompliant: boolean; issues: string[] } {
+    const issues: string[] = [];
+    
+    // Check for required extensions
+    const requiredExtensions = ['basicConstraints', 'keyUsage', 'subjectKeyIdentifier', 'authorityKeyIdentifier'];
+    const foundExtensions = extensions.map(ext => ext.name);
+    
+    for (const required of requiredExtensions) {
+      if (!foundExtensions.includes(required)) {
+        issues.push(`Missing required extension: ${required}`);
+      }
+    }
+    
+    // Validate Basic Constraints
+    const basicConstraints = extensions.find(ext => ext.name === 'basicConstraints');
+    if (basicConstraints) {
+      if (isCA && !basicConstraints.critical) {
+        issues.push('Basic Constraints must be critical for CA certificates');
+      }
+      if (isCA && basicConstraints.pathLenConstraint !== undefined && basicConstraints.pathLenConstraint < 0) {
+        issues.push('Path length constraint must be non-negative');
+      }
+    }
+    
+    // Validate Key Usage
+    const keyUsage = extensions.find(ext => ext.name === 'keyUsage');
+    if (keyUsage) {
+      if (isCA && !keyUsage.critical) {
+        issues.push('Key Usage must be critical for CA certificates');
+      }
+      if (isCA && !keyUsage.keyCertSign) {
+        issues.push('CA certificates must have keyCertSign capability');
+      }
+      if (isCA && !keyUsage.cRLSign) {
+        issues.push('CA certificates must have cRLSign capability');
+      }
+    }
+    
+    // Validate Policy Constraints (if present)
+    const policyConstraints = extensions.find(ext => ext.name === 'policyConstraints');
+    if (policyConstraints && isCA && !policyConstraints.critical) {
+      issues.push('Policy Constraints must be critical for CA certificates');
+    }
+    
+    // Validate Name Constraints (if present)
+    const nameConstraints = extensions.find(ext => ext.name === 'nameConstraints');
+    if (nameConstraints && isCA && !nameConstraints.critical) {
+      issues.push('Name Constraints must be critical for CA certificates');
+    }
+    
+    return {
+      isCompliant: issues.length === 0,
+      issues
+    };
+  }
+
   static signCertificateFromCSR(
     csrPem: string,
     caCertPem: string,
@@ -257,9 +314,13 @@ export class X509Utils {
     isCA: boolean,
     sans?: string[],
     opts?: {
-      extKeyUsage?: { serverAuth?: boolean; clientAuth?: boolean };
+      extKeyUsage?: { serverAuth?: boolean; clientAuth?: boolean; codeSigning?: boolean; emailProtection?: boolean; timeStamping?: boolean; ocspSigning?: boolean };
       crlDistributionPointUrl?: string;
       ocspUrl?: string;
+      pathLenConstraint?: number; // For CA certificates
+      certificatePolicies?: string[]; // Policy OIDs
+      policyConstraints?: { requireExplicitPolicy?: number; inhibitPolicyMapping?: number };
+      nameConstraints?: { permittedSubtrees?: string[]; excludedSubtrees?: string[] };
     }
   ): string {
     const csr = forge.pki.certificationRequestFromPem(csrPem);
@@ -282,26 +343,157 @@ export class X509Utils {
     cert.setSubject(csr.subject.attributes);
     cert.setIssuer(caCert.subject.attributes);
 
-    const extensions: any[] = [
-      { name: 'basicConstraints', cA: isCA },
-      { name: 'keyUsage', digitalSignature: true, keyEncipherment: true, dataEncipherment: true, keyCertSign: isCA, cRLSign: isCA },
-      { name: 'subjectKeyIdentifier' },
-      { name: 'authorityKeyIdentifier', keyIdentifier: this.getSubjectKeyIdentifier(caCert) },
-    ];
+    // Build extensions with proper X.509 compliance
+    const extensions: any[] = [];
 
-    if (sans && sans.length > 0) {
-      extensions.push({ name: 'subjectAltName', altNames: sans.map((s) => ({ type: 2, value: s })) });
+    // 1. Basic Constraints (CRITICAL for CA certificates)
+    const basicConstraints: any = { 
+      name: 'basicConstraints', 
+      cA: isCA,
+      critical: isCA // Critical for CA certificates
+    };
+    
+    // Add path length constraint for CA certificates
+    if (isCA && opts?.pathLenConstraint !== undefined) {
+      basicConstraints.pathLenConstraint = opts.pathLenConstraint;
     }
+    extensions.push(basicConstraints);
 
+    // 2. Key Usage (CRITICAL for CA certificates)
+    const keyUsage: any = { 
+      name: 'keyUsage',
+      critical: isCA // Critical for CA certificates
+    };
+
+    if (isCA) {
+      // CA-specific key usage
+      keyUsage.keyCertSign = true;    // Certificate signing
+      keyUsage.cRLSign = true;        // CRL signing
+      keyUsage.digitalSignature = true; // Digital signature
+    } else {
+      // End-entity key usage based on certificate type
+      keyUsage.digitalSignature = true;
+      keyUsage.keyEncipherment = true;
+      keyUsage.dataEncipherment = true;
+      keyUsage.keyAgreement = false;
+      keyUsage.keyCertSign = false;
+      keyUsage.cRLSign = false;
+      keyUsage.encipherOnly = false;
+      keyUsage.decipherOnly = false;
+    }
+    extensions.push(keyUsage);
+
+    // 3. Subject Key Identifier (Non-critical)
+    extensions.push({ 
+      name: 'subjectKeyIdentifier',
+      critical: false
+    });
+
+    // 4. Authority Key Identifier (Non-critical)
+    extensions.push({ 
+      name: 'authorityKeyIdentifier', 
+      keyIdentifier: this.getSubjectKeyIdentifier(caCert),
+      critical: false
+    });
+
+    // 5. Extended Key Usage (Non-critical, purpose-specific)
     if (opts?.extKeyUsage) {
-      extensions.push({ name: 'extKeyUsage', ...opts.extKeyUsage });
+      const extKeyUsage: any = { 
+        name: 'extKeyUsage',
+        critical: false
+      };
+
+      // Add specific key usage purposes
+      if (opts.extKeyUsage.serverAuth) extKeyUsage.serverAuth = true;
+      if (opts.extKeyUsage.clientAuth) extKeyUsage.clientAuth = true;
+      if (opts.extKeyUsage.codeSigning) extKeyUsage.codeSigning = true;
+      if (opts.extKeyUsage.emailProtection) extKeyUsage.emailProtection = true;
+      if (opts.extKeyUsage.timeStamping) extKeyUsage.timeStamping = true;
+      if (opts.extKeyUsage.ocspSigning) extKeyUsage.ocspSigning = true;
+
+      extensions.push(extKeyUsage);
     }
 
+    // 6. Subject Alternative Names (Non-critical)
+    if (sans && sans.length > 0) {
+      extensions.push({ 
+        name: 'subjectAltName', 
+        altNames: sans.map((s) => ({ type: 2, value: s })),
+        critical: false
+      });
+    }
+
+    // 7. Certificate Policies (Non-critical)
+    if (opts?.certificatePolicies && opts.certificatePolicies.length > 0) {
+      const policyIdentifiers = opts.certificatePolicies.map(policyOid => ({
+        policyIdentifier: policyOid,
+        policyQualifiers: [] // Can be extended with policy qualifiers
+      }));
+
+      extensions.push({
+        name: 'certificatePolicies',
+        value: policyIdentifiers,
+        critical: false
+      });
+    }
+
+    // 8. Policy Constraints (CRITICAL for CA certificates)
+    if (isCA && opts?.policyConstraints) {
+      const policyConstraints: any = {
+        name: 'policyConstraints',
+        critical: true
+      };
+
+      if (opts.policyConstraints.requireExplicitPolicy !== undefined) {
+        policyConstraints.requireExplicitPolicy = opts.policyConstraints.requireExplicitPolicy;
+      }
+
+      if (opts.policyConstraints.inhibitPolicyMapping !== undefined) {
+        policyConstraints.inhibitPolicyMapping = opts.policyConstraints.inhibitPolicyMapping;
+      }
+
+      extensions.push(policyConstraints);
+    }
+
+    // 9. Name Constraints (CRITICAL for CA certificates)
+    if (isCA && opts?.nameConstraints) {
+      const nameConstraints: any = {
+        name: 'nameConstraints',
+        critical: true
+      };
+
+      if (opts.nameConstraints.permittedSubtrees && opts.nameConstraints.permittedSubtrees.length > 0) {
+        nameConstraints.permittedSubtrees = opts.nameConstraints.permittedSubtrees.map(domain => ({
+          type: 2, // DNS name
+          value: domain
+        }));
+      }
+
+      if (opts.nameConstraints.excludedSubtrees && opts.nameConstraints.excludedSubtrees.length > 0) {
+        nameConstraints.excludedSubtrees = opts.nameConstraints.excludedSubtrees.map(domain => ({
+          type: 2, // DNS name
+          value: domain
+        }));
+      }
+
+      extensions.push(nameConstraints);
+    }
+
+    // 10. CRL Distribution Points (Non-critical)
     if (opts?.crlDistributionPointUrl) {
-      // Minimal CRL DP as URI string
-      extensions.push({ name: 'cRLDistributionPoints', value: opts.crlDistributionPointUrl });
+      extensions.push({ 
+        name: 'cRLDistributionPoints', 
+        value: [{
+          distributionPoint: [{
+            type: 6, // URI
+            value: opts.crlDistributionPointUrl
+          }]
+        }],
+        critical: false
+      });
     }
 
+    // 11. Authority Information Access (Non-critical)
     if (opts?.ocspUrl) {
       extensions.push({
         name: 'authorityInfoAccess',
@@ -311,10 +503,17 @@ export class X509Utils {
             accessLocation: { type: 6, value: opts.ocspUrl },
           },
         ],
+        critical: false
       });
     }
 
     cert.setExtensions(extensions);
+
+    // Validate extensions for X.509 compliance
+    const validation = this.validateExtensions(extensions, isCA);
+    if (!validation.isCompliant) {
+      throw new Error(`X.509 extension validation failed: ${validation.issues.join(', ')}`);
+    }
 
     cert.sign(caPrivateKey, forge.md.sha256.create());
     return forge.pki.certificateToPem(cert);
@@ -326,5 +525,25 @@ export class X509Utils {
     const sha1 = forge.md.sha1.create();
     sha1.update(publicKeyDer);
     return sha1.digest().getBytes();
+  }
+
+  // Get detailed extension information for debugging
+  static getExtensionDetails(certPem: string): Array<{ name: string; critical: boolean; value: any }> {
+    const cert = forge.pki.certificateFromPem(certPem);
+    return cert.extensions.map(ext => ({
+      name: ext.name,
+      critical: ext.critical,
+      value: ext.value
+    }));
+  }
+
+  // Verify certificate extensions compliance
+  static verifyCertificateCompliance(certPem: string): { isCompliant: boolean; issues: string[] } {
+    const cert = forge.pki.certificateFromPem(certPem);
+    const isCA = cert.extensions.some(ext => 
+      ext.name === 'basicConstraints' && ext.value && ext.value.cA
+    );
+    
+    return this.validateExtensions(cert.extensions, isCA);
   }
 }

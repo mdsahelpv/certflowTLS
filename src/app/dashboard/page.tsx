@@ -160,6 +160,11 @@ export default function DashboardPage() {
     return null;
   }
 
+  // Ensure session exists before accessing user properties
+  if (!session) {
+    return null;
+  }
+
   const userRole = session.user.role;
   const permissions = session.user.permissions;
 

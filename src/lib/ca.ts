@@ -151,6 +151,8 @@ export class CAService {
     // Sign certificate (real X.509 signing using CA)
     const encryptedKey = JSON.parse(caConfig.privateKey);
     const caPrivateKey = Encryption.decrypt(encryptedKey.encrypted, encryptedKey.iv, encryptedKey.tag);
+    
+    // Enhanced X.509 compliant certificate signing
     const certificate = X509Utils.signCertificateFromCSR(
       csr!,
       caConfig.certificate!,
@@ -160,14 +162,23 @@ export class CAService {
       data.certificateType === 'CA',
       data.sans,
       {
-        extKeyUsage:
-          data.certificateType === 'SERVER'
-            ? { serverAuth: true }
-            : data.certificateType === 'CLIENT'
-            ? { clientAuth: true }
-            : undefined,
+        // Extended Key Usage based on certificate type
+        extKeyUsage: this.getExtendedKeyUsage(data.certificateType),
+        
+        // CRL and OCSP URLs
         crlDistributionPointUrl: process.env.CRL_DISTRIBUTION_POINT || undefined,
         ocspUrl: process.env.OCSP_URL || undefined,
+        
+        // CA-specific extensions
+        ...(data.certificateType === 'CA' && {
+          pathLenConstraint: parseInt(process.env.CA_PATH_LENGTH_CONSTRAINT || '0'),
+          certificatePolicies: this.getDefaultCertificatePolicies(),
+          policyConstraints: {
+            requireExplicitPolicy: parseInt(process.env.POLICY_REQUIRE_EXPLICIT || '0'),
+            inhibitPolicyMapping: parseInt(process.env.POLICY_INHIBIT_MAPPING || '0')
+          },
+          nameConstraints: this.getNameConstraints()
+        })
       }
     );
 
@@ -463,5 +474,37 @@ export class CAService {
     });
 
     return result;
+  }
+
+  private static getExtendedKeyUsage(type: CertificateType) {
+    switch (type) {
+      case 'SERVER':
+        return { serverAuth: true };
+      case 'CLIENT':
+        return { clientAuth: true };
+      case 'CA':
+        return { 
+          keyCertSign: true, 
+          cRLSign: true,
+          ocspSigning: true 
+        };
+      default:
+        return undefined;
+    }
+  }
+
+  private static getDefaultCertificatePolicies(): string[] {
+    return [
+      '2.5.29.32.0', // Any Policy
+      '1.3.6.1.4.1.311.21.10', // Example enterprise policy
+      '1.3.6.1.5.5.7.2.1' // CPS qualifier
+    ];
+  }
+
+  private static getNameConstraints() {
+    return {
+      permittedSubtrees: ['example.com', '*.example.com'],
+      excludedSubtrees: ['internal.example.com']
+    };
   }
 }
