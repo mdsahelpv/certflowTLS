@@ -185,7 +185,15 @@ export class CRLUtils {
     }>,
     issuerDN: string,
     caPrivateKeyPem: string,
-    nextUpdate: Date
+    nextUpdate: Date,
+    options: {
+      crlNumber?: number;
+      caCertificatePem?: string;
+      crlDistributionPoint?: string;
+      deltaCRL?: boolean;
+      deltaCRLIndicator?: number;
+      authorityInfoAccess?: string;
+    } = {}
   ): string {
     const crl = forge.pki.createCertificateRevocationList();
 
@@ -194,7 +202,7 @@ export class CRLUtils {
     crl.thisUpdate = new Date();
     crl.nextUpdate = nextUpdate;
 
-    // Revoked entries
+    // Revoked entries with enhanced revocation reasons
     crl.revokedCertificates = revokedCertificates.map((rc) => ({
       serialNumber: new forge.jsbn.BigInteger(rc.serialNumber, 16),
       revocationDate: rc.revocationDate,
@@ -207,10 +215,142 @@ export class CRLUtils {
       ],
     }));
 
+    // Add CRL extensions
+    const extensions: any[] = [];
+
+    // 1. CRL Number (critical)
+    if (options.crlNumber !== undefined) {
+      extensions.push({
+        id: 'cRLNumber',
+        value: new forge.jsbn.BigInteger(options.crlNumber.toString()),
+        critical: false,
+      });
+    }
+
+    // 2. Authority Key Identifier (non-critical)
+    if (options.caCertificatePem) {
+      try {
+        const caCert = forge.pki.certificateFromPem(options.caCertificatePem);
+        const authorityKeyId = this.generateAuthorityKeyIdentifier(caCert);
+        extensions.push({
+          id: 'authorityKeyIdentifier',
+          value: authorityKeyId,
+          critical: false,
+        });
+      } catch (error) {
+        console.warn('Failed to generate Authority Key Identifier:', error);
+      }
+    }
+
+    // 3. CRL Distribution Points (non-critical)
+    if (options.crlDistributionPoint) {
+      extensions.push({
+        id: 'cRLDistributionPoints',
+        value: [{
+          distributionPoint: [{
+            type: 6, // URI
+            value: options.crlDistributionPoint
+          }],
+          reasons: [1, 2, 3, 4, 5, 6, 8, 9, 10], // All revocation reasons
+          cRLIssuer: null
+        }],
+        critical: false,
+      });
+    }
+
+    // 4. Delta CRL Indicator (critical for delta CRLs)
+    if (options.deltaCRL && options.deltaCRLIndicator !== undefined) {
+      extensions.push({
+        id: 'deltaCRLIndicator',
+        value: new forge.jsbn.BigInteger(options.deltaCRLIndicator.toString()),
+        critical: true,
+      });
+    }
+
+    // 5. Authority Information Access (non-critical)
+    if (options.authorityInfoAccess) {
+      extensions.push({
+        id: 'authorityInfoAccess',
+        value: [{
+          accessMethod: '1.3.6.1.5.5.7.48.2', // id-ad-caIssuers
+          accessLocation: {
+            type: 6, // URI
+            value: options.authorityInfoAccess
+          }
+        }],
+        critical: false,
+      });
+    }
+
+    // 6. Issuing Distribution Point (critical)
+    if (options.crlDistributionPoint) {
+      extensions.push({
+        id: 'issuingDistributionPoint',
+        value: {
+          distributionPoint: [{
+            type: 6, // URI
+            value: options.crlDistributionPoint
+          }],
+          onlyContainsUserCerts: false,
+          onlyContainsCACerts: false,
+          onlySomeReasons: null,
+          indirectCRL: false,
+          onlyContainsAttributeCerts: false
+        },
+        critical: true,
+      });
+    }
+
+    // Apply extensions
+    if (extensions.length > 0) {
+      crl.extensions = extensions;
+    }
+
     // Sign
     const caPrivateKey = forge.pki.privateKeyFromPem(caPrivateKeyPem);
     crl.sign(caPrivateKey, forge.md.sha256.create());
     return forge.pki.crlToPem(crl);
+  }
+
+  // Generate Delta CRL
+  static generateDeltaCRL(
+    revokedCertificates: Array<{
+      serialNumber: string;
+      revocationDate: Date;
+      reason: string;
+    }>,
+    issuerDN: string,
+    caPrivateKeyPem: string,
+    nextUpdate: Date,
+    baseCRLNumber: number,
+    deltaCRLNumber: number,
+    options: {
+      caCertificatePem?: string;
+      crlDistributionPoint?: string;
+      authorityInfoAccess?: string;
+    } = {}
+  ): string {
+    return this.generateCRL(revokedCertificates, issuerDN, caPrivateKeyPem, nextUpdate, {
+      ...options,
+      deltaCRL: true,
+      deltaCRLIndicator: deltaCRLNumber,
+      crlNumber: baseCRLNumber,
+    });
+  }
+
+  // Generate Authority Key Identifier from CA certificate
+  private static generateAuthorityKeyIdentifier(caCert: any): any {
+    const publicKey = caCert.publicKey;
+    const keyId = forge.pki.getPublicKeyFingerprint(publicKey, {
+      algorithm: 'sha256',
+      encoding: 'hex'
+    });
+    
+    return {
+      keyIdentifier: forge.util.hexToBytes(keyId),
+      authorityCertIssuer: null,
+      authorityCertSerialNumber: null
+    };
   }
 
   private static crlReasonToValue(reason: string): number {
@@ -227,6 +367,109 @@ export class CRLUtils {
       AA_COMPROMISE: 10,
     };
     return map[reason] ?? 0;
+  }
+
+  // Enhanced revocation reason mapping with descriptions
+  static getRevocationReasonDescription(reason: string): { code: number; description: string; critical: boolean } {
+    const reasons: Record<string, { code: number; description: string; critical: boolean }> = {
+      UNSPECIFIED: { code: 0, description: 'Unspecified', critical: false },
+      KEY_COMPROMISE: { code: 1, description: 'Key Compromise', critical: true },
+      CA_COMPROMISE: { code: 2, description: 'CA Compromise', critical: true },
+      AFFILIATION_CHANGED: { code: 3, description: 'Affiliation Changed', critical: false },
+      SUPERSEDED: { code: 4, description: 'Superseded', critical: false },
+      CESSATION_OF_OPERATION: { code: 5, description: 'Cessation of Operation', critical: false },
+      CERTIFICATE_HOLD: { code: 6, description: 'Certificate Hold', critical: false },
+      REMOVE_FROM_CRL: { code: 8, description: 'Remove from CRL', critical: false },
+      PRIVILEGE_WITHDRAWN: { code: 9, description: 'Privilege Withdrawn', critical: false },
+      AA_COMPROMISE: { code: 10, description: 'AA Compromise', critical: true },
+    };
+    return reasons[reason] ?? reasons.UNSPECIFIED;
+  }
+
+  // Validate CRL extensions
+  static validateCRLExtensions(crlPem: string): { isValid: boolean; issues: string[] } {
+    try {
+      const crl = forge.pki.crlFromPem(crlPem);
+      const issues: string[] = [];
+
+      // Check for required extensions
+      if (!crl.extensions) {
+        issues.push('CRL has no extensions');
+        return { isValid: false, issues };
+      }
+
+      const extensions = crl.extensions;
+      const extensionNames = extensions.map(ext => ext.name || ext.id);
+
+      // Check for CRL Number
+      if (!extensionNames.includes('cRLNumber')) {
+        issues.push('Missing CRL Number extension');
+      }
+
+      // Check for Authority Key Identifier
+      if (!extensionNames.includes('authorityKeyIdentifier')) {
+        issues.push('Missing Authority Key Identifier extension');
+      }
+
+      // Check for Issuing Distribution Point (should be critical)
+      const issuingDP = extensions.find(ext => ext.name === 'issuingDistributionPoint' || ext.id === '2.5.29.28');
+      if (issuingDP && !issuingDP.critical) {
+        issues.push('Issuing Distribution Point extension should be critical');
+      }
+
+      // Check for Delta CRL Indicator (should be critical if present)
+      const deltaCRL = extensions.find(ext => ext.name === 'deltaCRLIndicator' || ext.id === '2.5.29.27');
+      if (deltaCRL && !deltaCRL.critical) {
+        issues.push('Delta CRL Indicator extension should be critical');
+      }
+
+      return {
+        isValid: issues.length === 0,
+        issues
+      };
+    } catch (error) {
+      return {
+        isValid: false,
+        issues: [`Failed to parse CRL: ${error instanceof Error ? error.message : String(error)}`]
+      };
+    }
+  }
+
+  // Get CRL information and statistics
+  static getCRLInfo(crlPem: string): {
+    issuer: string;
+    thisUpdate: Date;
+    nextUpdate: Date;
+    revokedCount: number;
+    crlNumber?: number;
+    isDeltaCRL: boolean;
+    deltaCRLIndicator?: number;
+    extensions: string[];
+  } {
+    try {
+      const crl = forge.pki.crlFromPem(crlPem);
+      
+      const crlNumber = crl.extensions?.find(ext => 
+        ext.name === 'cRLNumber' || ext.id === '2.5.29.20'
+      )?.value?.toString();
+      
+      const deltaCRLIndicator = crl.extensions?.find(ext => 
+        ext.name === 'deltaCRLIndicator' || ext.id === '2.5.29.27'
+      )?.value?.toString();
+
+      return {
+        issuer: forge.pki.distinguishedNameToString(crl.issuer),
+        thisUpdate: crl.thisUpdate,
+        nextUpdate: crl.nextUpdate,
+        revokedCount: crl.revokedCertificates?.length || 0,
+        crlNumber: crlNumber ? parseInt(crlNumber) : undefined,
+        isDeltaCRL: !!deltaCRLIndicator,
+        deltaCRLIndicator: deltaCRLIndicator ? parseInt(deltaCRLIndicator) : undefined,
+        extensions: crl.extensions?.map(ext => ext.name || ext.id) || [],
+      };
+    } catch (error) {
+      throw new Error(`Failed to parse CRL: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 
   static convertDNToForgeAttrs(dn: string): any[] {

@@ -314,12 +314,23 @@ export class CAService {
     const encryptedKey = JSON.parse(caConfig.privateKey);
     const caPrivateKey = Encryption.decrypt(encryptedKey.encrypted, encryptedKey.iv, encryptedKey.tag);
 
-    // Generate CRL (valid for 24h by default)
+    // Get CA certificate for extensions
+    if (!caConfig.certificate) {
+      throw new Error('CA certificate not found');
+    }
+
+    // Generate CRL with enhanced extensions
     const crl = CRLUtils.generateCRL(
       revokedCertificates,
       caConfig.subjectDN,
       caPrivateKey,
-      new Date(Date.now() + 24 * 60 * 60 * 1000)
+      new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
+      {
+        crlNumber: caConfig.crlNumber + 1,
+        caCertificatePem: caConfig.certificate,
+        crlDistributionPoint: caConfig.crlDistributionPoint || undefined,
+        authorityInfoAccess: caConfig.ocspUrl || undefined,
+      }
     );
 
     // Update CRL number
@@ -342,14 +353,224 @@ export class CAService {
     // Log audit event
     await AuditService.log({
       action: 'CRL_GENERATED',
-      description: `CRL #${newCrlNumber} generated`,
+      description: `CRL #${newCrlNumber} generated with ${revokedCertificates.length} revoked certificates`,
       metadata: {
         crlNumber: newCrlNumber,
         revokedCount: revokedCertificates.length,
+        hasExtensions: true,
+        crlDistributionPoint: caConfig.crlDistributionPoint || null,
       },
     });
 
     return crl;
+  }
+
+  // Generate Delta CRL for incremental updates
+  static async generateDeltaCRL(): Promise<string> {
+    const caConfig = await db.cAConfig.findFirst();
+    if (!caConfig || caConfig.status !== CAStatus.ACTIVE) {
+      throw new Error('CA is not active');
+    }
+
+    // Get the last full CRL
+    const lastFullCRL = await db.cRL.findFirst({
+      where: { caId: caConfig.id },
+      orderBy: { crlNumber: 'desc' },
+    });
+
+    if (!lastFullCRL) {
+      throw new Error('No base CRL found for delta CRL generation');
+    }
+
+    // Get certificates revoked since the last full CRL
+    const lastRevocationDate = lastFullCRL.issuedAt;
+    const recentRevocations = await db.certificateRevocation.findMany({
+      where: {
+        revocationDate: {
+          gt: lastRevocationDate,
+        },
+      },
+      include: {
+        certificate: true,
+      },
+    });
+
+    if (recentRevocations.length === 0) {
+      throw new Error('No new revocations since last full CRL');
+    }
+
+    const revokedCertificates = recentRevocations.map(rev => ({
+      serialNumber: rev.serialNumber,
+      revocationDate: rev.revocationDate,
+      reason: rev.revocationReason,
+    }));
+
+    // Decrypt CA private key
+    const encryptedKey = JSON.parse(caConfig.privateKey);
+    const caPrivateKey = Encryption.decrypt(encryptedKey.encrypted, encryptedKey.iv, encryptedKey.tag);
+
+    // Get CA certificate for extensions
+    if (!caConfig.certificate) {
+      throw new Error('CA certificate not found');
+    }
+
+    // Generate Delta CRL
+    const deltaCRL = CRLUtils.generateDeltaCRL(
+      revokedCertificates,
+      caConfig.subjectDN,
+      caPrivateKey,
+      new Date(Date.now() + 6 * 60 * 60 * 1000), // 6 hours for delta CRL
+      lastFullCRL.crlNumber,
+      caConfig.crlNumber + 1,
+      {
+        caCertificatePem: caConfig.certificate,
+        crlDistributionPoint: caConfig.crlDistributionPoint || undefined,
+        authorityInfoAccess: caConfig.ocspUrl || undefined,
+      }
+    );
+
+    // Update CRL number
+    const newCrlNumber = caConfig.crlNumber + 1;
+    await db.cAConfig.update({
+      where: { id: caConfig.id },
+      data: { crlNumber: newCrlNumber },
+    });
+
+    // Store Delta CRL
+    await db.cRL.create({
+      data: {
+        crlNumber: newCrlNumber,
+        crlData: deltaCRL,
+        nextUpdate: new Date(Date.now() + 6 * 60 * 60 * 1000), // 6 hours
+        ca: { connect: { id: caConfig.id } },
+      },
+    });
+
+    // Log audit event
+    await AuditService.log({
+      action: 'CRL_GENERATED',
+      description: `Delta CRL #${newCrlNumber} generated with ${revokedCertificates.length} new revocations`,
+      metadata: {
+        crlNumber: newCrlNumber,
+        revokedCount: revokedCertificates.length,
+        isDeltaCRL: true,
+        baseCRLNumber: lastFullCRL.crlNumber,
+        hasExtensions: true,
+        crlDistributionPoint: caConfig.crlDistributionPoint || null,
+      },
+    });
+
+    return deltaCRL;
+  }
+
+  // Validate CRL extensions and compliance
+  static async validateCRL(crlPem: string): Promise<{
+    isValid: boolean;
+    issues: string[];
+    info: {
+      issuer: string;
+      thisUpdate: Date;
+      nextUpdate: Date;
+      revokedCount: number;
+      crlNumber?: number;
+      isDeltaCRL: boolean;
+      deltaCRLIndicator?: number;
+      extensions: string[];
+    };
+  }> {
+    try {
+      const validation = CRLUtils.validateCRLExtensions(crlPem);
+      const info = CRLUtils.getCRLInfo(crlPem);
+
+      return {
+        isValid: validation.isValid,
+        issues: validation.issues,
+        info,
+      };
+    } catch (error) {
+      return {
+        isValid: false,
+        issues: [`Failed to validate CRL: ${error instanceof Error ? error.message : String(error)}`],
+        info: {
+          issuer: 'Unknown',
+          thisUpdate: new Date(),
+          nextUpdate: new Date(),
+          revokedCount: 0,
+          extensions: [],
+          isDeltaCRL: false,
+        },
+      };
+    }
+  }
+
+  // Get CRL statistics and information
+  static async getCRLStatistics(): Promise<{
+    totalCRLs: number;
+    lastFullCRL?: {
+      crlNumber: number;
+      issuedAt: Date;
+      nextUpdate: Date;
+      revokedCount: number;
+    };
+    lastDeltaCRL?: {
+      crlNumber: number;
+      issuedAt: Date;
+      nextUpdate: Date;
+      revokedCount: number;
+    };
+    totalRevokedCertificates: number;
+    crlDistributionPoint?: string;
+    nextCRLUpdate?: Date;
+  }> {
+    const caConfig = await db.cAConfig.findFirst();
+    if (!caConfig) {
+      throw new Error('CA configuration not found');
+    }
+
+    // Get all CRLs
+    const crls = await db.cRL.findMany({
+      where: { caId: caConfig.id },
+      orderBy: { crlNumber: 'desc' },
+    });
+
+    // Get total revoked certificates
+    const totalRevoked = await db.certificateRevocation.count();
+
+    // Find last full CRL and delta CRL
+    let lastFullCRL: any = null;
+    let lastDeltaCRL: any = null;
+
+    for (const crl of crls) {
+      try {
+        const info = CRLUtils.getCRLInfo(crl.crlData);
+        if (info.isDeltaCRL && !lastDeltaCRL) {
+          lastDeltaCRL = {
+            crlNumber: crl.crlNumber,
+            issuedAt: crl.issuedAt,
+            nextUpdate: crl.nextUpdate,
+            revokedCount: info.revokedCount,
+          };
+        } else if (!info.isDeltaCRL && !lastFullCRL) {
+          lastFullCRL = {
+            crlNumber: crl.crlNumber,
+            issuedAt: crl.issuedAt,
+            nextUpdate: crl.nextUpdate,
+            revokedCount: info.revokedCount,
+          };
+        }
+      } catch (error) {
+        console.warn(`Failed to parse CRL ${crl.crlNumber}:`, error);
+      }
+    }
+
+    return {
+      totalCRLs: crls.length,
+      lastFullCRL,
+      lastDeltaCRL,
+      totalRevokedCertificates: totalRevoked,
+      crlDistributionPoint: caConfig.crlDistributionPoint || undefined,
+      nextCRLUpdate: lastFullCRL?.nextUpdate,
+    };
   }
 
   static async getCertificates(filters?: {
