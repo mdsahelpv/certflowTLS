@@ -117,6 +117,7 @@ model Certificate {
   caId             String?           // Issuing CA
   revokedAt        DateTime?
   revocationReason String?
+  lastValidated    DateTime?         // When certificate was last validated
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
 
@@ -184,6 +185,8 @@ enum AuditAction {
   CERTIFICATE_ISSUED
   CERTIFICATE_RENEWED
   CERTIFICATE_REVOKED
+  CERTIFICATE_VALIDATED
+  CERTIFICATE_VALIDATION_ERROR
   CRL_GENERATED
   USER_CREATED
   USER_UPDATED

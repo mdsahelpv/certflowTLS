@@ -248,6 +248,205 @@ export class X509Utils {
     return { notBefore: cert.validity.notBefore, notAfter: cert.validity.notAfter };
   }
 
+  // Validate certificate chain and verify signatures
+  static validateCertificateChain(
+    certificatePem: string,
+    caCertificates: string[],
+    options: {
+      checkExpiration?: boolean;
+      checkRevocation?: boolean;
+      maxChainLength?: number;
+    } = {}
+  ): { isValid: boolean; issues: string[]; chain: Array<{ cert: forge.pki.Certificate; status: string }> } {
+    const issues: string[] = [];
+    const chain: Array<{ cert: forge.pki.Certificate; status: string }> = [];
+    
+    try {
+      // Parse the certificate
+      const cert = forge.pki.certificateFromPem(certificatePem);
+      chain.push({ cert, status: 'valid' });
+      
+      // Check certificate expiration if requested
+      if (options.checkExpiration !== false) {
+        const now = new Date();
+        if (now < cert.validity.notBefore) {
+          issues.push(`Certificate is not yet valid. Valid from: ${cert.validity.notBefore}`);
+        }
+        if (now > cert.validity.notAfter) {
+          issues.push(`Certificate has expired. Expired on: ${cert.validity.notAfter}`);
+        }
+      }
+      
+      // Verify certificate signature
+      if (!cert.verify(cert.publicKey)) {
+        issues.push('Certificate signature verification failed');
+      }
+      
+      // Build and validate certificate chain
+      const maxChainLength = options.maxChainLength || 10;
+      let currentCert = cert;
+      let chainLength = 0;
+      
+      while (chainLength < maxChainLength) {
+        // Find issuer certificate
+        const issuerCert = this.findIssuerCertificate(currentCert, caCertificates);
+        if (!issuerCert) {
+          if (chainLength === 0) {
+            issues.push('No issuer certificate found for the certificate');
+          } else {
+            // This is the root CA
+            break;
+          }
+        } else {
+          // Verify signature with issuer's public key
+          if (!currentCert.verify(issuerCert.publicKey)) {
+            issues.push(`Certificate signature verification failed with issuer: ${issuerCert.subject.getField('CN')?.value || 'Unknown'}`);
+          }
+          
+          // Check if issuer is a CA
+          const basicConstraints = issuerCert.getExtension('basicConstraints');
+          if (!basicConstraints || !basicConstraints.value || !basicConstraints.value.cA) {
+            issues.push(`Issuer certificate is not a CA: ${issuerCert.subject.getField('CN')?.value || 'Unknown'}`);
+          }
+          
+          // Check issuer's key usage
+          const keyUsage = issuerCert.getExtension('keyUsage');
+          if (!keyUsage || !keyUsage.value || !keyUsage.value.keyCertSign) {
+            issues.push(`Issuer certificate cannot sign other certificates: ${issuerCert.subject.getField('CN')?.value || 'Unknown'}`);
+          }
+          
+          chain.push({ cert: issuerCert, status: 'valid' });
+          currentCert = issuerCert;
+        }
+        
+        chainLength++;
+      }
+      
+      if (chainLength >= maxChainLength) {
+        issues.push(`Certificate chain too long (max: ${maxChainLength})`);
+      }
+      
+    } catch (error) {
+      issues.push(`Error parsing certificate: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    
+    return {
+      isValid: issues.length === 0,
+      issues,
+      chain
+    };
+  }
+
+  // Find issuer certificate from a list of CA certificates
+  private static findIssuerCertificate(
+    certificate: forge.pki.Certificate,
+    caCertificates: string[]
+  ): forge.pki.Certificate | null {
+    const issuerDN = certificate.issuer.getField('CN')?.value;
+    
+    for (const caCertPem of caCertificates) {
+      try {
+        const caCert = forge.pki.certificateFromPem(caCertPem);
+        const caSubjectDN = caCert.subject.getField('CN')?.value;
+        
+        if (issuerDN === caSubjectDN) {
+          return caCert;
+        }
+      } catch (error) {
+        // Skip invalid certificates
+        continue;
+      }
+    }
+    
+    return null;
+  }
+
+  // Verify certificate signature
+  static verifyCertificateSignature(certificatePem: string, issuerPublicKeyPem: string): boolean {
+    try {
+      const cert = forge.pki.certificateFromPem(certificatePem);
+      const issuerPublicKey = forge.pki.publicKeyFromPem(issuerPublicKeyPem);
+      return cert.verify(issuerPublicKey);
+    } catch (error) {
+      return false;
+    }
+  }
+
+  // Check certificate expiration
+  static isCertificateExpired(certificatePem: string): { expired: boolean; daysUntilExpiry: number; validFrom: Date; validTo: Date } {
+    try {
+      const cert = forge.pki.certificateFromPem(certificatePem);
+      const now = new Date();
+      const validFrom = cert.validity.notBefore;
+      const validTo = cert.validity.notAfter;
+      
+      const expired = now > validTo;
+      const daysUntilExpiry = Math.ceil((validTo.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+      
+      return {
+        expired,
+        daysUntilExpiry: expired ? 0 : daysUntilExpiry,
+        validFrom,
+        validTo
+      };
+    } catch (error) {
+      return {
+        expired: true,
+        daysUntilExpiry: 0,
+        validFrom: new Date(),
+        validTo: new Date()
+      };
+    }
+  }
+
+  // Get certificate chain information
+  static getCertificateChainInfo(certificatePem: string, caCertificates: string[]): {
+    chainLength: number;
+    isComplete: boolean;
+    rootCA: string | null;
+    intermediateCAs: string[];
+    endEntity: string;
+  } {
+    try {
+      const cert = forge.pki.certificateFromPem(certificatePem);
+      const chain = this.validateCertificateChain(certificatePem, caCertificates, { checkExpiration: false });
+      
+      const endEntity = cert.subject.getField('CN')?.value || 'Unknown';
+      const intermediateCAs: string[] = [];
+      let rootCA: string | null = null;
+      
+      // Skip the first certificate (end entity)
+      for (let i = 1; i < chain.chain.length; i++) {
+        const chainCert = chain.chain[i].cert;
+        const cn = chainCert.subject.getField('CN')?.value || 'Unknown';
+        
+        if (i === chain.chain.length - 1) {
+          // Last certificate in chain is the root CA
+          rootCA = cn;
+        } else {
+          // Intermediate CAs
+          intermediateCAs.push(cn);
+        }
+      }
+      
+      return {
+        chainLength: chain.chain.length,
+        isComplete: chain.isValid,
+        rootCA,
+        intermediateCAs,
+        endEntity
+      };
+    } catch (error) {
+      return {
+        chainLength: 0,
+        isComplete: false,
+        rootCA: null,
+        intermediateCAs: [],
+        endEntity: 'Unknown'
+      };
+    }
+  }
+
   // Validate X.509 extensions for compliance
   static validateExtensions(extensions: any[], isCA: boolean): { isCompliant: boolean; issues: string[] } {
     const issues: string[] = [];

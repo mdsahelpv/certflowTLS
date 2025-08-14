@@ -16,7 +16,8 @@ import {
   Settings,
   LogOut,
   ChevronDown,
-  User
+  User,
+  CheckCircle
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -89,6 +90,15 @@ export default function Layout({ children }: LayoutProps) {
                   <Button variant="ghost" size="sm" className="hidden md:inline-flex">
                     <Bell className="h-4 w-4 mr-2" />
                     Notifications
+                  </Button>
+                </Link>
+              )}
+              {/* Show Validate for users with certificate:validate or certificate:view permission */}
+              {(permissions.includes('certificate:validate') || permissions.includes('certificate:view')) && (
+                <Link href="/certificates/validate">
+                  <Button variant="ghost" size="sm" className="hidden md:inline-flex">
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Validate
                   </Button>
                 </Link>
               )}
