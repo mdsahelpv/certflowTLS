@@ -1,0 +1,85 @@
+import { NextResponse } from 'next/server';
+import { getToken } from 'next-auth/jwt';
+import type { NextRequest } from 'next/server';
+import { securityMiddleware } from './middleware-security';
+
+export async function middleware(request: NextRequest) {
+  // Bypass security middleware for test page
+  if (request.nextUrl.pathname === '/test') {
+    return NextResponse.next();
+  }
+
+  // Apply security middleware first
+  const securityResponse = securityMiddleware(request);
+  if (securityResponse) {
+    return securityResponse;
+  }
+
+  const token = await getToken({ req: request });
+  const isAuthenticated = !!token;
+
+  // Define protected routes
+  const protectedRoutes = ['/dashboard', '/certificates', '/ca', '/crl', '/audit', '/users', '/notifications'];
+  const adminRoutes = ['/users', '/ca'];
+  const operatorRoutes = ['/certificates/issue', '/certificates/revoke', '/crl'];
+
+  const { pathname } = request.nextUrl;
+
+  // Check if the current path is a protected route
+  const isProtectedRoute = protectedRoutes.some(route => 
+    pathname.startsWith(route)
+  );
+
+  // Check if the current path requires admin privileges
+  const isAdminRoute = adminRoutes.some(route => 
+    pathname.startsWith(route)
+  );
+
+  // Check if the current path requires operator privileges
+  const isOperatorRoute = operatorRoutes.some(route => 
+    pathname.startsWith(route)
+  );
+
+  // Redirect unauthenticated users to login page for protected routes
+  if (isProtectedRoute && !isAuthenticated) {
+    const loginUrl = new URL('/auth/signin', request.url);
+    loginUrl.searchParams.set('callbackUrl', pathname);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  // Check role-based permissions
+  if (isAuthenticated) {
+    const userRole = token.role as string;
+    const userPermissions = token.permissions as string[];
+
+    // Admin routes require ADMIN role
+    if (isAdminRoute && userRole !== 'ADMIN') {
+      return NextResponse.redirect(new URL('/dashboard', request.url));
+    }
+
+    // Operator routes require OPERATOR or ADMIN role
+    if (isOperatorRoute && !['ADMIN', 'OPERATOR'].includes(userRole)) {
+      return NextResponse.redirect(new URL('/dashboard', request.url));
+    }
+  }
+
+  // If user is authenticated and tries to access auth pages, redirect to dashboard
+  if (isAuthenticated && pathname.startsWith('/auth')) {
+    return NextResponse.redirect(new URL('/dashboard', request.url));
+  }
+
+  return NextResponse.next();
+}
+
+export const config = {
+  matcher: [
+    /*
+     * Match all request paths except for the ones starting with:
+     * - api (API routes)
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     */
+    '/((?!api|_next/static|_next/image|favicon.ico).*)',
+  ],
+};
