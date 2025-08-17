@@ -4,10 +4,10 @@ import { SecurityMiddleware } from '@/lib/security';
 
 export function securityMiddleware(request: NextRequest) {
   // Enforce HTTPS in production
-  // const httpsRedirect = SecurityMiddleware.enforceHTTPS(request);
-  // if (httpsRedirect) {
-  //   return httpsRedirect;
-  // }
+  const httpsRedirect = SecurityMiddleware.enforceHTTPS(request);
+  if (httpsRedirect) {
+    return httpsRedirect;
+  }
 
   // Validate origin for API routes
   if (request.nextUrl.pathname.startsWith('/api/')) {

@@ -5,7 +5,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -182,7 +182,6 @@ enum AuditAction {
   LOGOUT
   CA_CSR_GENERATED
   CA_CERTIFICATE_UPLOADED
-  CA_DELETED
   CERTIFICATE_ISSUED
   CERTIFICATE_RENEWED
   CERTIFICATE_REVOKED
