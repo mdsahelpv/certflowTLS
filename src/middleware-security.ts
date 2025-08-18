@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { SecurityMiddleware } from '@/lib/security';
+export const runtime = 'nodejs';
 
 export function securityMiddleware(request: NextRequest) {
   // Enforce HTTPS in production

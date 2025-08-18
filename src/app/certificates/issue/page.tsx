@@ -594,11 +594,11 @@ export default function IssueCertificatePage() {
                     />
                   </div>
 
-                  <Button 
-                    onClick={handleIssueCertificate} 
-                    disabled={isLoading || !formData.commonName}
-                    className="w-full"
-                  >
+        <Button 
+          onClick={handleIssueCertificate} 
+          disabled={isLoading || (csrMode === 'generate' ? !formData.commonName : !csrSubject)}
+          className="w-full"
+        >
                     {isLoading ? (
                       <>
                         <RefreshCw className="mr-2 h-4 w-4 animate-spin" />

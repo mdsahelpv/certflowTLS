@@ -6,12 +6,24 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, Shield, Key } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 
-export default function SignInPage() {
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+
+import { Suspense } from 'react';
+
+function SignInContent() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -19,8 +31,8 @@ export default function SignInPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get('callbackUrl') || '/dashboard';
-  
-  // Use custom auth hook
+
+  // Custom auth hook
   const { isAuthenticated, isLoading, refreshSession } = useAuth();
 
   // Redirect if already authenticated
@@ -47,29 +59,13 @@ export default function SignInPage() {
     setError('');
 
     try {
-      const result = await signIn('credentials', {
+      await signIn('credentials', {
         username,
         password,
-        redirect: false,
+        redirect: true,
+        callbackUrl,
       });
-
-      if (result?.error) {
-        setError('Invalid username or password');
-      } else if (result?.ok) {
-        // Force a session refresh to ensure immediate authentication state update
-        try {
-          await refreshSession();
-          
-          // Small delay to ensure session is properly updated
-          setTimeout(() => {
-            router.push(callbackUrl);
-          }, 100);
-        } catch (refreshError) {
-          // If refresh fails, still redirect (session might be valid)
-          router.push(callbackUrl);
-        }
-      }
-    } catch (error) {
+    } catch {
       setError('An error occurred during sign in');
     } finally {
       setIsSubmitting(false);
@@ -108,7 +104,7 @@ export default function SignInPage() {
                   <AlertDescription>{error}</AlertDescription>
                 </Alert>
               )}
-              
+
               <div className="space-y-2">
                 <Label htmlFor="username">Username</Label>
                 <Input
@@ -136,12 +132,8 @@ export default function SignInPage() {
               </div>
             </CardContent>
 
-            <CardFooter>
-              <Button 
-                type="submit" 
-                className="w-full"
-                disabled={isSubmitting}
-              >
+            <CardFooter className="mt-8">
+              <Button type="submit" className="w-full" disabled={isSubmitting}>
                 {isSubmitting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -161,5 +153,22 @@ export default function SignInPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function SignInPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+          <div className="flex items-center gap-2">
+            <Loader2 className="h-6 w-6 animate-spin" />
+            <span>Loading...</span>
+          </div>
+        </div>
+      }
+    >
+      <SignInContent />
+    </Suspense>
   );
 }
