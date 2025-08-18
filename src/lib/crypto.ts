@@ -828,6 +828,7 @@ export class X509Utils {
     // 3. Subject Key Identifier (Non-critical)
     extensions.push({ 
       name: 'subjectKeyIdentifier',
+      keyIdentifier: this.getSubjectKeyIdentifier(cert),
       critical: false
     });
 
@@ -835,25 +836,36 @@ export class X509Utils {
     extensions.push({ 
       name: 'authorityKeyIdentifier', 
       keyIdentifier: this.getSubjectKeyIdentifier(caCert),
+      authorityCertIssuer: [
+        {
+          type: 4,
+          value: caCert.issuer.attributes,
+        }
+      ],
+      authorityCertSerialNumber: caCert.serialNumber,
       critical: false
     });
 
     // 5. Extended Key Usage (Non-critical, purpose-specific)
     if (opts?.extKeyUsage) {
-      const extKeyUsage: any = { 
-        name: 'extKeyUsage',
-        critical: false
-      };
-
-      // Add specific key usage purposes
-      if (opts.extKeyUsage.serverAuth) extKeyUsage.serverAuth = true;
-      if (opts.extKeyUsage.clientAuth) extKeyUsage.clientAuth = true;
-      if (opts.extKeyUsage.codeSigning) extKeyUsage.codeSigning = true;
-      if (opts.extKeyUsage.emailProtection) extKeyUsage.emailProtection = true;
-      if (opts.extKeyUsage.timeStamping) extKeyUsage.timeStamping = true;
-      if (opts.extKeyUsage.ocspSigning) extKeyUsage.ocspSigning = true;
-
-      extensions.push(extKeyUsage);
+      const extKeyUsage: any = { name: 'extKeyUsage', critical: false };
+      const anySet = (
+        opts.extKeyUsage.serverAuth ||
+        opts.extKeyUsage.clientAuth ||
+        opts.extKeyUsage.codeSigning ||
+        opts.extKeyUsage.emailProtection ||
+        opts.extKeyUsage.timeStamping ||
+        opts.extKeyUsage.ocspSigning
+      );
+      if (anySet) {
+        if (opts.extKeyUsage.serverAuth) extKeyUsage.serverAuth = true;
+        if (opts.extKeyUsage.clientAuth) extKeyUsage.clientAuth = true;
+        if (opts.extKeyUsage.codeSigning) extKeyUsage.codeSigning = true;
+        if (opts.extKeyUsage.emailProtection) extKeyUsage.emailProtection = true;
+        if (opts.extKeyUsage.timeStamping) extKeyUsage.timeStamping = true;
+        if (opts.extKeyUsage.ocspSigning) extKeyUsage.ocspSigning = true;
+        extensions.push(extKeyUsage);
+      }
     }
 
     // 6. Subject Alternative Names (Non-critical)
@@ -865,71 +877,37 @@ export class X509Utils {
       });
     }
 
-    // 7. Certificate Policies (Non-critical)
-    if (opts?.certificatePolicies && opts.certificatePolicies.length > 0) {
-      const policyIdentifiers = opts.certificatePolicies.map(policyOid => ({
-        policyIdentifier: policyOid,
-        policyQualifiers: [] // Can be extended with policy qualifiers
-      }));
+    // 7. Certificate Policies (Non-critical) — disabled for compatibility
+    // if (opts?.certificatePolicies && opts.certificatePolicies.length > 0) {
+    //   const policyIdentifiers = opts.certificatePolicies.map(policyOid => ({
+    //     policyIdentifier: policyOid,
+    //     policyQualifiers: [] // Can be extended with policy qualifiers
+    //   }));
+    //   extensions.push({ name: 'certificatePolicies', value: policyIdentifiers, critical: false });
+    // }
 
-      extensions.push({
-        name: 'certificatePolicies',
-        value: policyIdentifiers,
-        critical: false
-      });
-    }
+    // 8. Policy Constraints (CRITICAL for CA certificates) — disabled for compatibility
+    // if (isCA && opts?.policyConstraints) {
+    //   const policyConstraints: any = { name: 'policyConstraints', critical: true };
+    //   if (opts.policyConstraints.requireExplicitPolicy !== undefined) policyConstraints.requireExplicitPolicy = opts.policyConstraints.requireExplicitPolicy;
+    //   if (opts.policyConstraints.inhibitPolicyMapping !== undefined) policyConstraints.inhibitPolicyMapping = opts.policyConstraints.inhibitPolicyMapping;
+    //   extensions.push(policyConstraints);
+    // }
 
-    // 8. Policy Constraints (CRITICAL for CA certificates)
-    if (isCA && opts?.policyConstraints) {
-      const policyConstraints: any = {
-        name: 'policyConstraints',
-        critical: true
-      };
-
-      if (opts.policyConstraints.requireExplicitPolicy !== undefined) {
-        policyConstraints.requireExplicitPolicy = opts.policyConstraints.requireExplicitPolicy;
-      }
-
-      if (opts.policyConstraints.inhibitPolicyMapping !== undefined) {
-        policyConstraints.inhibitPolicyMapping = opts.policyConstraints.inhibitPolicyMapping;
-      }
-
-      extensions.push(policyConstraints);
-    }
-
-    // 9. Name Constraints (CRITICAL for CA certificates)
-    if (isCA && opts?.nameConstraints) {
-      const nameConstraints: any = {
-        name: 'nameConstraints',
-        critical: true
-      };
-
-      if (opts.nameConstraints.permittedSubtrees && opts.nameConstraints.permittedSubtrees.length > 0) {
-        nameConstraints.permittedSubtrees = opts.nameConstraints.permittedSubtrees.map(domain => ({
-          type: 2, // DNS name
-          value: domain
-        }));
-      }
-
-      if (opts.nameConstraints.excludedSubtrees && opts.nameConstraints.excludedSubtrees.length > 0) {
-        nameConstraints.excludedSubtrees = opts.nameConstraints.excludedSubtrees.map(domain => ({
-          type: 2, // DNS name
-          value: domain
-        }));
-      }
-
-      extensions.push(nameConstraints);
-    }
+    // 9. Name Constraints (CRITICAL for CA certificates) — disabled for compatibility
+    // if (isCA && opts?.nameConstraints) {
+    //   const nameConstraints: any = { name: 'nameConstraints', critical: true };
+    //   if (opts.nameConstraints.permittedSubtrees?.length) nameConstraints.permittedSubtrees = opts.nameConstraints.permittedSubtrees.map(domain => ({ type: 2, value: domain }));
+    //   if (opts.nameConstraints.excludedSubtrees?.length) nameConstraints.excludedSubtrees = opts.nameConstraints.excludedSubtrees.map(domain => ({ type: 2, value: domain }));
+    //   extensions.push(nameConstraints);
+    // }
 
     // 10. CRL Distribution Points (Non-critical)
     if (opts?.crlDistributionPointUrl) {
       extensions.push({ 
         name: 'cRLDistributionPoints', 
-        value: [{
-          distributionPoint: [{
-            type: 6, // URI
-            value: opts.crlDistributionPointUrl
-          }]
+        distributions: [{
+          fullName: [{ type: 6, value: opts.crlDistributionPointUrl }]
         }],
         critical: false
       });
@@ -939,7 +917,7 @@ export class X509Utils {
     if (opts?.ocspUrl) {
       extensions.push({
         name: 'authorityInfoAccess',
-        accessDescriptions: [
+        descriptions: [
           {
             accessMethod: 'ocsp',
             accessLocation: { type: 6, value: opts.ocspUrl },

@@ -184,15 +184,9 @@ export class CAService {
         crlDistributionPointUrl: process.env.CRL_DISTRIBUTION_POINT || undefined,
         ocspUrl: process.env.OCSP_URL || undefined,
         
-        // CA-specific extensions
+        // CA-specific basic constraints only; advanced policy/name constraints omitted for compatibility
         ...(data.certificateType === 'CA' && {
-          pathLenConstraint: parseInt(process.env.CA_PATH_LENGTH_CONSTRAINT || '0'),
-          certificatePolicies: this.getDefaultCertificatePolicies(),
-          policyConstraints: {
-            requireExplicitPolicy: parseInt(process.env.POLICY_REQUIRE_EXPLICIT || '0'),
-            inhibitPolicyMapping: parseInt(process.env.POLICY_INHIBIT_MAPPING || '0')
-          },
-          nameConstraints: this.getNameConstraints()
+          pathLenConstraint: parseInt(process.env.CA_PATH_LENGTH_CONSTRAINT || '0')
         })
       }
     );
