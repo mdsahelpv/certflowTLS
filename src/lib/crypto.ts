@@ -865,61 +865,30 @@ export class X509Utils {
       });
     }
 
-    // 7. Certificate Policies (Non-critical)
-    if (opts?.certificatePolicies && opts.certificatePolicies.length > 0) {
-      const policyIdentifiers = opts.certificatePolicies.map(policyOid => ({
-        policyIdentifier: policyOid,
-        policyQualifiers: [] // Can be extended with policy qualifiers
-      }));
+    // 7. Certificate Policies (Non-critical) — disabled for compatibility
+    // if (opts?.certificatePolicies && opts.certificatePolicies.length > 0) {
+    //   const policyIdentifiers = opts.certificatePolicies.map(policyOid => ({
+    //     policyIdentifier: policyOid,
+    //     policyQualifiers: [] // Can be extended with policy qualifiers
+    //   }));
+    //   extensions.push({ name: 'certificatePolicies', value: policyIdentifiers, critical: false });
+    // }
 
-      extensions.push({
-        name: 'certificatePolicies',
-        value: policyIdentifiers,
-        critical: false
-      });
-    }
+    // 8. Policy Constraints (CRITICAL for CA certificates) — disabled for compatibility
+    // if (isCA && opts?.policyConstraints) {
+    //   const policyConstraints: any = { name: 'policyConstraints', critical: true };
+    //   if (opts.policyConstraints.requireExplicitPolicy !== undefined) policyConstraints.requireExplicitPolicy = opts.policyConstraints.requireExplicitPolicy;
+    //   if (opts.policyConstraints.inhibitPolicyMapping !== undefined) policyConstraints.inhibitPolicyMapping = opts.policyConstraints.inhibitPolicyMapping;
+    //   extensions.push(policyConstraints);
+    // }
 
-    // 8. Policy Constraints (CRITICAL for CA certificates)
-    if (isCA && opts?.policyConstraints) {
-      const policyConstraints: any = {
-        name: 'policyConstraints',
-        critical: true
-      };
-
-      if (opts.policyConstraints.requireExplicitPolicy !== undefined) {
-        policyConstraints.requireExplicitPolicy = opts.policyConstraints.requireExplicitPolicy;
-      }
-
-      if (opts.policyConstraints.inhibitPolicyMapping !== undefined) {
-        policyConstraints.inhibitPolicyMapping = opts.policyConstraints.inhibitPolicyMapping;
-      }
-
-      extensions.push(policyConstraints);
-    }
-
-    // 9. Name Constraints (CRITICAL for CA certificates)
-    if (isCA && opts?.nameConstraints) {
-      const nameConstraints: any = {
-        name: 'nameConstraints',
-        critical: true
-      };
-
-      if (opts.nameConstraints.permittedSubtrees && opts.nameConstraints.permittedSubtrees.length > 0) {
-        nameConstraints.permittedSubtrees = opts.nameConstraints.permittedSubtrees.map(domain => ({
-          type: 2, // DNS name
-          value: domain
-        }));
-      }
-
-      if (opts.nameConstraints.excludedSubtrees && opts.nameConstraints.excludedSubtrees.length > 0) {
-        nameConstraints.excludedSubtrees = opts.nameConstraints.excludedSubtrees.map(domain => ({
-          type: 2, // DNS name
-          value: domain
-        }));
-      }
-
-      extensions.push(nameConstraints);
-    }
+    // 9. Name Constraints (CRITICAL for CA certificates) — disabled for compatibility
+    // if (isCA && opts?.nameConstraints) {
+    //   const nameConstraints: any = { name: 'nameConstraints', critical: true };
+    //   if (opts.nameConstraints.permittedSubtrees?.length) nameConstraints.permittedSubtrees = opts.nameConstraints.permittedSubtrees.map(domain => ({ type: 2, value: domain }));
+    //   if (opts.nameConstraints.excludedSubtrees?.length) nameConstraints.excludedSubtrees = opts.nameConstraints.excludedSubtrees.map(domain => ({ type: 2, value: domain }));
+    //   extensions.push(nameConstraints);
+    // }
 
     // 10. CRL Distribution Points (Non-critical)
     if (opts?.crlDistributionPointUrl) {
