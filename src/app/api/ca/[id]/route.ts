@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { AuditService } from '@/lib/audit';
+import { AuditAction } from '@prisma/client';
 
 export async function DELETE(
   request: Request,
@@ -28,7 +29,7 @@ export async function DELETE(
     });
 
     await AuditService.log({
-      action: 'CA_DELETED' as any,
+      action: AuditAction.CA_DELETED,
       userId: session.user.id,
       username: session.user.username,
       description: `CA deleted: ${id}`,
