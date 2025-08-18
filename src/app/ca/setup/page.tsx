@@ -259,6 +259,7 @@ export default function CASetupPage() {
                           <TableHead>Valid From</TableHead>
                           <TableHead>Valid To</TableHead>
                           <TableHead>Issued Certs</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -272,6 +273,40 @@ export default function CASetupPage() {
                             <TableCell>{ca.validFrom ? new Date(ca.validFrom).toLocaleDateString() : '-'}</TableCell>
                             <TableCell>{ca.validTo ? new Date(ca.validTo).toLocaleDateString() : '-'}</TableCell>
                             <TableCell>{ca.certificateCount}</TableCell>
+                            <TableCell className="text-right">
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={async () => {
+                                  if (!session || session.user.role !== 'ADMIN') return;
+                                  const proceed = window.confirm('This will permanently delete the selected CA and all issued certificates associated with it. This action cannot be undone. Are you sure you want to continue?');
+                                  if (!proceed) return;
+                                  try {
+                                    setIsLoading(true);
+                                    setError('');
+                                    const res = await fetch(`/api/ca/${ca.id}`, { method: 'DELETE' });
+                                    if (!res.ok) {
+                                      const data = await res.json().catch(() => ({}));
+                                      throw new Error(data.error || 'Failed to delete CA');
+                                    }
+                                    setSuccess('CA deleted successfully');
+                                    // Refresh list
+                                    const refreshed = await fetch('/api/ca/status');
+                                    if (refreshed.ok) {
+                                      const list = await refreshed.json();
+                                      setExistingCAs(list);
+                                    }
+                                  } catch (e: any) {
+                                    setError(e?.message || 'Failed to delete CA');
+                                  } finally {
+                                    setIsLoading(false);
+                                  }
+                                }}
+                                disabled={isLoading}
+                              >
+                                Delete
+                              </Button>
+                            </TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
