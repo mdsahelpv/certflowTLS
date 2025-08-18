@@ -12,9 +12,17 @@ export interface AuditLogData {
 
 export class AuditService {
   static async log(data: AuditLogData): Promise<AuditLog> {
-    const headersList = await (headers() as any);
-    const ipAddress = headersList.get('x-forwarded-for') || headersList.get('x-real-ip') || 'unknown';
-    const userAgent = headersList.get('user-agent') || 'unknown';
+    let ipAddress = 'unknown';
+    let userAgent = 'unknown';
+    try {
+      const headersList = await (headers() as any);
+      if (headersList && typeof headersList.get === 'function') {
+        ipAddress = headersList.get('x-forwarded-for') || headersList.get('x-real-ip') || 'unknown';
+        userAgent = headersList.get('user-agent') || 'unknown';
+      }
+    } catch {
+      // Not in a request context; leave defaults
+    }
 
     return await db.auditLog.create({
       data: {
