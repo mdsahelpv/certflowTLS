@@ -50,10 +50,35 @@ export async function POST(request: Request) {
       );
     }
 
-    // If using external CSR, validate it
-    if (data.csr && !data.csr.includes('-----BEGIN CERTIFICATE REQUEST-----')) {
+    // If using external CSR, validate it and forbid private key upload
+    if (data.csr) {
+      if (typeof data.csr !== 'string' || !data.csr.includes('-----BEGIN CERTIFICATE REQUEST-----')) {
+        return NextResponse.json(
+          { error: 'Invalid CSR format' },
+          { status: 400 }
+        );
+      }
+      if (data.privateKey) {
+        return NextResponse.json(
+          { error: 'Private key upload is not allowed' },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Enforce sane validityDays bounds
+    const validityDays = Number(data.validityDays);
+    if (!Number.isInteger(validityDays) || validityDays < 1 || validityDays > 3989) {
       return NextResponse.json(
-        { error: 'Invalid CSR format' },
+        { error: 'validityDays must be an integer between 1 and 3989' },
+        { status: 400 }
+      );
+    }
+
+    // Basic SAN validation (optional)
+    if (data.sans && !Array.isArray(data.sans)) {
+      return NextResponse.json(
+        { error: 'sans must be an array of DNS names' },
         { status: 400 }
       );
     }

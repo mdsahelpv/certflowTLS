@@ -76,8 +76,7 @@ export default function IssueCertificatePage() {
     validityDays: 365,
     keySize: 2048,
     curve: 'P-256',
-    externalCsr: '',
-    externalPrivateKey: ''
+    externalCsr: ''
   });
 
   useEffect(() => {
@@ -140,7 +139,6 @@ export default function IssueCertificatePage() {
           throw new Error('CSR is required for external certificate signing');
         }
         requestData.csr = formData.externalCsr;
-        requestData.privateKey = formData.externalPrivateKey;
       }
 
       const response = await fetch('/api/certificates/issue', {
@@ -378,7 +376,6 @@ export default function IssueCertificatePage() {
                             <SelectContent>
                               <SelectItem value={KeyAlgorithm.RSA}>RSA</SelectItem>
                               <SelectItem value={KeyAlgorithm.ECDSA}>ECDSA</SelectItem>
-                              <SelectItem value={KeyAlgorithm.Ed25519}>Ed25519</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
@@ -447,18 +444,6 @@ export default function IssueCertificatePage() {
                         )}
                       </div>
                         
-                      <div className="space-y-2">
-                        <Label htmlFor="externalPrivateKey">Private Key (Optional - for storage)</Label>
-                        <Textarea
-                          id="externalPrivateKey"
-                          value={formData.externalPrivateKey}
-                          onChange={(e) => setFormData(prev => ({ ...prev, externalPrivateKey: e.target.value }))}
-                          placeholder="-----BEGIN PRIVATE KEY-----&#10;...&#10;-----END PRIVATE KEY-----"
-                          rows={8}
-                          className="font-mono text-xs"
-                        />
-                      </div>
-
                       {/* Readonly Subject from CSR */}
                       {csrSubject && (
                         <div className="space-y-2">
@@ -758,8 +743,7 @@ export default function IssueCertificatePage() {
                     setFormData({
                       ...formData,
                       commonName: '',
-                      externalCsr: '',
-                      externalPrivateKey: ''
+                      externalCsr: ''
                     });
                     setSans(['']);
                   }}
