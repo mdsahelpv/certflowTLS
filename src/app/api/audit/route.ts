@@ -24,13 +24,24 @@ export async function GET(request: Request) {
     }
 
     const { searchParams } = new URL(request.url);
+    // Parse and clamp pagination
+    let limit = parseInt(searchParams.get('limit') || '50', 10);
+    let page = parseInt(searchParams.get('page') || '1', 10);
+    if (!Number.isFinite(limit) || limit < 1) limit = 50;
+    if (limit > 200) limit = 200;
+    if (!Number.isFinite(page) || page < 1) page = 1;
+
     const filters: any = {
-      limit: parseInt(searchParams.get('limit') || '50'),
-      offset: parseInt(searchParams.get('offset') || '0'),
+      limit,
+      offset: (page - 1) * limit,
     };
 
     if (searchParams.get('action')) {
-      filters.action = searchParams.get('action') as AuditAction;
+      const action = searchParams.get('action') as string;
+      const allowed: string[] = Object.values(AuditAction);
+      if (allowed.includes(action)) {
+        filters.action = action as AuditAction;
+      }
     }
 
     if (searchParams.get('username')) {
@@ -45,9 +56,7 @@ export async function GET(request: Request) {
       filters.endDate = new Date(searchParams.get('endDate')!);
     }
 
-    // Handle page parameter
-    const page = parseInt(searchParams.get('page') || '1');
-    filters.offset = (page - 1) * filters.limit;
+    // offset already computed from page
 
     const result = await AuditService.getAuditLogs(filters);
 

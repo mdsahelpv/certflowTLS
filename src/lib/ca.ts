@@ -131,10 +131,25 @@ export class CAService {
     let publicKey: string | undefined;
     let csr: string | undefined;
 
-    if (data.privateKey && data.csr) {
-      // External CSR
-      privateKey = data.privateKey;
+    if (data.csr) {
+      // External CSR (do not accept or store uploaded private keys)
       csr = data.csr;
+      // If SANs are not provided, attempt to extract from CSR
+      try {
+        if (!data.sans || data.sans.length === 0) {
+          const forge = require('node-forge');
+          const req = forge.pki.certificationRequestFromPem(csr);
+          const extReq = req.getAttribute({ name: 'extensionRequest' });
+          if (extReq && extReq.extensions) {
+            const sanExt = extReq.extensions.find((e: any) => e.name === 'subjectAltName');
+            if (sanExt && Array.isArray(sanExt.altNames)) {
+              data.sans = sanExt.altNames
+                .filter((n: any) => n && (n.type === 2 || n.type === 'DNS'))
+                .map((n: any) => n.value);
+            }
+          }
+        }
+      } catch {}
     } else {
       // Generate new key pair and CSR
       const keyPair = CSRUtils.generateKeyPair(data.keyAlgorithm, data.keySize, data.curve);
@@ -187,7 +202,7 @@ export class CAService {
 
     // Encrypt private key if generated internally
     let encryptedPrivateKey: string | undefined;
-    if (privateKey && !data.privateKey) {
+    if (privateKey) {
       const encrypted = Encryption.encrypt(privateKey);
       encryptedPrivateKey = JSON.stringify(encrypted);
     }
