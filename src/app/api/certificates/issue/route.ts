@@ -84,10 +84,19 @@ export async function POST(request: Request) {
     }
 
     if (Array.isArray(data.sans)) {
-      const invalid = data.sans.some((s: unknown) => typeof s !== 'string' || s.length === 0 || s.length > 253);
+      const isDns = (host: string) => /^(?=.{1,253}$)(?!-)[A-Za-z0-9-]{1,63}(?<!-)(\.(?!-)[A-Za-z0-9-]{1,63}(?<!-))*\.?$/.test(host);
+      const isEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+      const invalid = data.sans.some((s: unknown) => {
+        if (typeof s !== 'string' || s.length === 0 || s.length > 253) return true;
+        // Allow DNS for all, email for CLIENT certs
+        if (data.certificateType === 'CLIENT') {
+          return !(isDns(s) || isEmail(s));
+        }
+        return !isDns(s);
+      });
       if (invalid) {
         return NextResponse.json(
-          { error: 'All SANs must be non-empty strings up to 253 chars' },
+          { error: data.certificateType === 'CLIENT' ? 'Each SAN must be a valid DNS name or email address' : 'Each SAN must be a valid DNS name' },
           { status: 400 }
         );
       }
@@ -98,6 +107,13 @@ export async function POST(request: Request) {
       if (!Array.isArray(data.sans) || data.sans.length === 0) {
         return NextResponse.json(
           { error: 'SERVER certificates must include at least one SAN' },
+          { status: 400 }
+        );
+      }
+      // Enforce max validity for SERVER certificates (CA/B Forum)
+      if (validityDays > 398) {
+        return NextResponse.json(
+          { error: 'SERVER certificate validityDays must not exceed 398 days' },
           { status: 400 }
         );
       }
