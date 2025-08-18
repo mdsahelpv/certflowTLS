@@ -109,8 +109,8 @@ export class SecurityMiddleware {
       errors.push('Invalid certificate type');
     }
 
-    // Validate key algorithm
-    const validAlgorithms = ['RSA', 'ECDSA', 'Ed25519'];
+    // Validate key algorithm (limit to supported signer algorithms)
+    const validAlgorithms = ['RSA', 'ECDSA'];
     if (!data.keyAlgorithm || !validAlgorithms.includes(data.keyAlgorithm)) {
       errors.push('Invalid key algorithm');
     }

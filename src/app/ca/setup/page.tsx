@@ -372,7 +372,6 @@ export default function CASetupPage() {
                       <SelectContent>
                         <SelectItem value={KeyAlgorithm.RSA}>RSA</SelectItem>
                         <SelectItem value={KeyAlgorithm.ECDSA}>ECDSA</SelectItem>
-                        <SelectItem value={KeyAlgorithm.Ed25519}>Ed25519</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

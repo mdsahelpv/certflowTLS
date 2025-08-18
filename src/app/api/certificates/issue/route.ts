@@ -75,12 +75,32 @@ export async function POST(request: Request) {
       );
     }
 
-    // Basic SAN validation (optional)
+    // Basic SAN validation
     if (data.sans && !Array.isArray(data.sans)) {
       return NextResponse.json(
         { error: 'sans must be an array of DNS names' },
         { status: 400 }
       );
+    }
+
+    if (Array.isArray(data.sans)) {
+      const invalid = data.sans.some((s: unknown) => typeof s !== 'string' || s.length === 0 || s.length > 253);
+      if (invalid) {
+        return NextResponse.json(
+          { error: 'All SANs must be non-empty strings up to 253 chars' },
+          { status: 400 }
+        );
+      }
+    }
+
+    // For server certificates, require at least one SAN per modern CA/Browsers expectations
+    if (data.certificateType === 'SERVER') {
+      if (!Array.isArray(data.sans) || data.sans.length === 0) {
+        return NextResponse.json(
+          { error: 'SERVER certificates must include at least one SAN' },
+          { status: 400 }
+        );
+      }
     }
 
     // Issue certificate
