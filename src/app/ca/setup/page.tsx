@@ -128,7 +128,11 @@ export default function CASetupPage() {
       const response = await fetch('/api/ca/upload-certificate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ certificate, caId: caResponse?.caId })
+        body: JSON.stringify({
+          certificate,
+          caId: caResponse?.caId,
+          certificateChain: (document.getElementById('certificate-chain') as HTMLTextAreaElement)?.value || undefined,
+        })
       });
 
       if (!response.ok) {
@@ -586,6 +590,32 @@ export default function CASetupPage() {
                     onChange={(e) => {
                       // keep textarea as the source of truth
                     }}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="certificate-chain">Certificate Chain (PEM bundle, optional)</Label>
+                  <input
+                    type="file"
+                    accept=".pem,.crt,.cer,.txt,application/x-x509-ca-cert,application/x-pem-file,text/plain"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      try {
+                        const text = await file.text();
+                        const el = document.getElementById('certificate-chain') as HTMLTextAreaElement | null;
+                        if (el) el.value = text;
+                      } catch (err) {
+                        setError('Failed to read chain file');
+                      }
+                    }}
+                    className="block w-full text-sm"
+                  />
+                  <Textarea
+                    id="certificate-chain"
+                    placeholder="-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----\n-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----"
+                    rows={10}
+                    className="font-mono text-xs"
                   />
                 </div>
 
