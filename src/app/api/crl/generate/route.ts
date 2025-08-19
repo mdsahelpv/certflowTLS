@@ -18,16 +18,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
     }
 
-    const { type = 'full' } = await request.json();
+    const { type = 'full', caId } = await request.json();
 
     let crl: string;
     let description: string;
 
     if (type === 'delta') {
-      crl = await CAService.generateDeltaCRL();
+      crl = await CAService.generateDeltaCRL(caId);
       description = 'Delta CRL generated successfully';
     } else {
-      crl = await CAService.generateCRL();
+      crl = await CAService.generateCRL(caId);
       description = 'Full CRL generated successfully';
     }
 

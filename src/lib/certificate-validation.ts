@@ -1,6 +1,7 @@
 import { db } from '@/lib/db';
 import { X509Utils } from './crypto';
 import { AuditService } from './audit';
+import forge from 'node-forge';
 
 export interface CertificateValidationResult {
   isValid: boolean;
@@ -157,7 +158,7 @@ export class CertificateValidationService {
   }> {
     try {
       // Extract serial number from certificate
-      const cert = require('node-forge').pki.certificateFromPem(certificatePem);
+      const cert = forge.pki.certificateFromPem(certificatePem);
       const serialNumber = cert.serialNumber;
 
       // Check database for revocation - use findFirst instead of findUnique
@@ -188,13 +189,13 @@ export class CertificateValidationService {
     caCertificates: string[]
   ): Promise<{ verified: boolean; issuer: string }> {
     try {
-      const cert = require('node-forge').pki.certificateFromPem(certificatePem);
+      const cert = forge.pki.certificateFromPem(certificatePem);
       const issuerDN = cert.issuer.getField('CN')?.value || 'Unknown';
 
       // Find issuer certificate
       const issuerCert = caCertificates.find(caCertPem => {
         try {
-          const caCert = require('node-forge').pki.certificateFromPem(caCertPem);
+          const caCert = forge.pki.certificateFromPem(caCertPem);
           const caSubjectDN = caCert.subject.getField('CN')?.value;
           return issuerDN === caSubjectDN;
         } catch {

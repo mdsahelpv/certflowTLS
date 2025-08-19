@@ -1,8 +1,11 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url);
+    const caId = searchParams.get('caId') || undefined;
+
     const revokedCertificates = await db.certificateRevocation.findMany({
       include: {
         certificate: {
@@ -18,6 +21,7 @@ export async function GET() {
           }
         }
       },
+      where: caId ? ({ certificate: { caId } } as any) : undefined,
       orderBy: { revocationDate: 'desc' }
     });
 

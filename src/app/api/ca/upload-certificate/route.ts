@@ -14,7 +14,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { certificate } = await request.json();
+    const { certificate, caId } = await request.json();
     
     if (!certificate) {
       return NextResponse.json(
@@ -32,8 +32,8 @@ export async function POST(request: Request) {
       );
     }
 
-    // Upload certificate
-    await CAService.uploadCACertificate(certificate);
+    // Upload certificate to specific CA
+    await CAService.uploadCACertificate(certificate, caId);
 
     return NextResponse.json({ success: true });
   } catch (error) {

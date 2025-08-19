@@ -34,14 +34,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // Check if CA is already initialized
-    const caStatus = await CAService.getCAStatus();
-    if (caStatus.some(s => s.status !== 'INITIALIZING')) {
-      return NextResponse.json(
-        { error: 'CA is already initialized' },
-        { status: 400 }
-      );
-    }
+    // Multi-CA support: allow multiple CA records
 
     // Initialize CA
     const result = await CAService.initializeCA(config);

@@ -2,7 +2,6 @@
 
 import { signOut } from 'next-auth/react';
 import { usePathname } from 'next/navigation';
-import { useState } from 'react';
 import Link from 'next/link';
 import SignInPage from '../app/auth/signin/page';
 import { Button } from '@/components/ui/button';
@@ -19,6 +18,14 @@ import {
   User,
   CheckCircle
 } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -28,7 +35,6 @@ interface LayoutProps {
 
 export default function Layout({ children }: LayoutProps) {
   const pathname = usePathname();
-  const [userMenuOpen, setUserMenuOpen] = useState(false);
   
   // Use custom auth hook
   const { session, isAuthenticated, isLoading } = useAuth();
@@ -110,61 +116,58 @@ export default function Layout({ children }: LayoutProps) {
                   </Button>
                 </Link>
               )}
-              <div className="relative">
-              <Button
-                variant="ghost"
-                size="sm"
-                  onClick={() => setUserMenuOpen(!userMenuOpen)}
-                  className="flex items-center space-x-2"
-                >
-                  <User className="h-5 w-5" />
-                  <span className="hidden sm:block">
-                    {session.user.name || session.user.username}
-                  </span>
-                  <Badge variant="outline" className="text-xs">
-                    {userRole}
-                  </Badge>
-                  <ChevronDown className="h-4 w-4" />
-                </Button>               
-
-                {userMenuOpen && (
-                  <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg py-1 z-50">
-                    <div className="px-4 py-2 border-b border-gray-200 dark:border-gray-700">
-                      <p className="text-sm font-medium text-gray-900 dark:text-white">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="flex items-center space-x-2">
+                    <User className="h-5 w-5" />
+                    <span className="hidden sm:block">
+                      {session.user.name || session.user.username}
+                    </span>
+                    <Badge variant="outline" className="text-xs">
+                      {userRole}
+                    </Badge>
+                    <ChevronDown className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel>
+                    <div className="flex flex-col">
+                      <span className="text-sm font-medium">
                         {session.user.name || session.user.username}
-                      </p>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                      </span>
+                      <span className="text-xs text-muted-foreground truncate">
                         {session.user.email}
-                      </p>
+                      </span>
                     </div>
-                    <Link href="/profile" onClick={() => setUserMenuOpen(false)}>
-                      <Button variant="ghost" className="w-full justify-start">
-                        <Settings className="h-4 w-4 mr-2" />
-                        Profile
-                      </Button>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <Link href="/profile" className="flex items-center gap-2">
+                      <Settings className="h-4 w-4" />
+                      <span>Profile</span>
                     </Link>
+                  </DropdownMenuItem>
                   {permissions.includes('user:manage') && (
-                    <Link href="/users" onClick={() => setUserMenuOpen(false)}>
-                      <Button variant="ghost" className="w-full justify-start">
-                        <Users className="h-4 w-4 mr-2" />
-                        User Management
-                      </Button>
-                    </Link>
+                    <DropdownMenuItem asChild>
+                      <Link href="/users" className="flex items-center gap-2">
+                        <Users className="h-4 w-4" />
+                        <span>User Management</span>
+                      </Link>
+                    </DropdownMenuItem>
                   )}
-                    <Button
-                      variant="ghost"
-                      className="w-full justify-start text-red-600 hover:text-red-700"
-                      onClick={() => {
-                        setUserMenuOpen(false);
-                        signOut();
-                      }}
-                    >
-                      <LogOut className="h-4 w-4 mr-2" />
-                      Sign out
-                    </Button>
-                  </div>
-                )}
-              </div>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onSelect={(e) => {
+                      e.preventDefault();
+                      signOut();
+                    }}
+                    className="text-red-600 focus:bg-red-50 dark:focus:bg-red-950/30 focus:text-red-700"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    <span>Sign out</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             
             </div>
           

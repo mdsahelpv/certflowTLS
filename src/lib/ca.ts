@@ -2,6 +2,7 @@ import { db } from '@/lib/db';
 import { CAStatus, KeyAlgorithm, CertificateType, CertificateStatus } from '@prisma/client';
 import { Encryption, CertificateUtils, CSRUtils, CRLUtils, X509Utils } from './crypto';
 import { AuditService } from './audit';
+import forge from 'node-forge';
 
 export interface CAConfigData {
   name?: string;
@@ -25,6 +26,7 @@ export interface CertificateData {
 
 export class CAService {
   static async initializeCA(config: CAConfigData): Promise<{
+    caId: string;
     csr: string;
     privateKey: string;
   }> {
@@ -39,7 +41,7 @@ export class CAService {
     const csr = CSRUtils.generateCSR(subject, keyPair.privateKey, keyPair.publicKey);
     
     // Store CA configuration
-    await db.cAConfig.create({
+    const created = await db.cAConfig.create({
       data: {
         name: (config as any).name || null,
         subjectDN: config.subjectDN,
@@ -59,11 +61,13 @@ export class CAService {
       metadata: { subjectDN: config.subjectDN, keyAlgorithm: config.keyAlgorithm },
     });
 
-    return { csr, privateKey: keyPair.privateKey };
+    return { caId: created.id, csr, privateKey: keyPair.privateKey };
   }
 
-  static async uploadCACertificate(certificate: string): Promise<void> {
-    const caConfig = await db.cAConfig.findFirst();
+  static async uploadCACertificate(certificate: string, caId?: string): Promise<void> {
+    const caConfig = caId
+      ? await db.cAConfig.findUnique({ where: { id: caId } })
+      : await db.cAConfig.findFirst();
     if (!caConfig) {
       throw new Error('CA configuration not found. Please initialize CA first.');
     }
@@ -137,7 +141,6 @@ export class CAService {
       // If SANs are not provided, attempt to extract from CSR
       try {
         if (!data.sans || data.sans.length === 0) {
-          const forge = require('node-forge');
           const req = forge.pki.certificationRequestFromPem(csr);
           const extReq = req.getAttribute({ name: 'extensionRequest' });
           if (extReq && extReq.extensions) {
@@ -296,21 +299,24 @@ export class CAService {
       },
     });
 
-    // Update CRL
-    await this.updateCRL();
+    // Update CRL for the certificate's CA
+    await this.updateCRL(certificate.caId || undefined);
   }
 
-  static async generateCRL(): Promise<string> {
-    const caConfig = await db.cAConfig.findFirst();
+  static async generateCRL(caId?: string): Promise<string> {
+    const caConfig = caId
+      ? await db.cAConfig.findUnique({ where: { id: caId } })
+      : await db.cAConfig.findFirst();
     if (!caConfig || caConfig.status !== CAStatus.ACTIVE) {
       throw new Error('CA is not active');
     }
 
-    // Get all revoked certificates
+    // Get revoked certificates for this CA
     const revocations = await db.certificateRevocation.findMany({
       include: {
         certificate: true,
       },
+      where: { certificate: { caId: caConfig.id } as any },
     });
 
     const revokedCertificates = revocations.map(rev => ({
@@ -375,8 +381,10 @@ export class CAService {
   }
 
   // Generate Delta CRL for incremental updates
-  static async generateDeltaCRL(): Promise<string> {
-    const caConfig = await db.cAConfig.findFirst();
+  static async generateDeltaCRL(caId?: string): Promise<string> {
+    const caConfig = caId
+      ? await db.cAConfig.findUnique({ where: { id: caId } })
+      : await db.cAConfig.findFirst();
     if (!caConfig || caConfig.status !== CAStatus.ACTIVE) {
       throw new Error('CA is not active');
     }
@@ -398,6 +406,7 @@ export class CAService {
         revocationDate: {
           gt: lastRevocationDate,
         },
+        certificate: { caId: caConfig.id } as any,
       },
       include: {
         certificate: true,
@@ -513,7 +522,7 @@ export class CAService {
   }
 
   // Get CRL statistics and information
-  static async getCRLStatistics(): Promise<{
+  static async getCRLStatistics(caId?: string): Promise<{
     totalCRLs: number;
     lastFullCRL?: {
       crlNumber: number;
@@ -531,7 +540,9 @@ export class CAService {
     crlDistributionPoint?: string;
     nextCRLUpdate?: Date;
   }> {
-    const caConfig = await db.cAConfig.findFirst();
+    const caConfig = caId
+      ? await db.cAConfig.findUnique({ where: { id: caId } })
+      : await db.cAConfig.findFirst();
     if (!caConfig) {
       throw new Error('CA configuration not found');
     }
@@ -543,7 +554,9 @@ export class CAService {
     });
 
     // Get total revoked certificates
-    const totalRevoked = await db.certificateRevocation.count();
+    const totalRevoked = await db.certificateRevocation.count({
+      where: { certificate: { caId: caConfig.id } as any },
+    });
 
     // Find last full CRL and delta CRL
     let lastFullCRL: any = null;
@@ -648,9 +661,9 @@ export class CAService {
 
   // Removed mock signer; using X509Utils.signCertificateFromCSR instead
 
-  private static async updateCRL(): Promise<void> {
+  private static async updateCRL(caId?: string): Promise<void> {
     try {
-      await this.generateCRL();
+      await this.generateCRL(caId);
     } catch (error) {
       console.error('Failed to update CRL:', error);
     }

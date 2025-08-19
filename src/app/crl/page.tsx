@@ -100,6 +100,7 @@ export default function CRLPage() {
   const [isGeneratingCRL, setIsGeneratingCRL] = useState(false);
   const [isValidatingCRL, setIsValidatingCRL] = useState(false);
   const [crlType, setCrlType] = useState<'full' | 'delta'>('full');
+  const [selectedCAId, setSelectedCAId] = useState<string>('');
   const [crlPemToValidate, setCrlPemToValidate] = useState('');
 
   useEffect(() => {
@@ -123,11 +124,20 @@ export default function CRLPage() {
     setError('');
 
     try {
-      const [crlResponse, revokedResponse, statsResponse] = await Promise.all([
-        fetch('/api/crl'),
-        fetch('/api/crl/revoked'),
-        fetch('/api/crl/validate')
+      // Load CAs, CRLs, revoked list, and stats for selected CA
+      const [caListRes, crlResponse, revokedResponse, statsResponse] = await Promise.all([
+        fetch('/api/ca/status'),
+        fetch(`/api/crl${selectedCAId ? `?caId=${selectedCAId}` : ''}`),
+        fetch(`/api/crl/revoked${selectedCAId ? `?caId=${selectedCAId}` : ''}`),
+        fetch(`/api/crl/validate${selectedCAId ? `?caId=${selectedCAId}` : ''}`)
       ]);
+
+      if (caListRes.ok) {
+        const caList = await caListRes.json();
+        if (!selectedCAId && caList.length > 0) {
+          setSelectedCAId(caList.find((c: any) => c.status === 'ACTIVE')?.id || caList[0].id);
+        }
+      }
 
       if (crlResponse.ok) {
         const crlData = await crlResponse.json();
@@ -164,7 +174,7 @@ export default function CRLPage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ type: crlType }),
+        body: JSON.stringify({ type: crlType, caId: selectedCAId || undefined }),
       });
 
       if (response.ok) {
