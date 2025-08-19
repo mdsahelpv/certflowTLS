@@ -538,22 +538,32 @@ export class X509Utils {
             break;
           }
         } else {
-          // Verify signature with issuer's public key
-          if (!currentCert.verify(issuerCert.publicKey)) {
-            issues.push(`Certificate signature verification failed with issuer: ${issuerCert.subject.getField('CN')?.value || 'Unknown'}`);
+          // Verify signature with issuer's public key, never throw
+          try {
+            if (!currentCert.verify(issuerCert.publicKey)) {
+              issues.push(`Certificate signature verification failed with issuer: ${issuerCert.subject.getField('CN')?.value || 'Unknown'}`);
+            }
+          } catch (e) {
+            issues.push(`Certificate signature verification error with issuer: ${issuerCert.subject.getField('CN')?.value || 'Unknown'}`);
           }
-          
-          // Check if issuer is a CA
-          const basicConstraints = issuerCert.getExtension('basicConstraints');
-          if (!basicConstraints || !basicConstraints.value || !basicConstraints.value.cA) {
-            issues.push(`Issuer certificate is not a CA: ${issuerCert.subject.getField('CN')?.value || 'Unknown'}`);
-          }
+
+          // Check if issuer is a CA (defensive: extension shapes vary)
+          try {
+            const basicConstraints: any = issuerCert.getExtension('basicConstraints');
+            const isCA = basicConstraints?.cA ?? basicConstraints?.value?.cA ?? false;
+            if (!isCA) {
+              issues.push(`Issuer certificate is not a CA: ${issuerCert.subject.getField('CN')?.value || 'Unknown'}`);
+            }
+          } catch {}
           
           // Check issuer's key usage
-          const keyUsage = issuerCert.getExtension('keyUsage');
-          if (!keyUsage || !keyUsage.value || !keyUsage.value.keyCertSign) {
-            issues.push(`Issuer certificate cannot sign other certificates: ${issuerCert.subject.getField('CN')?.value || 'Unknown'}`);
-          }
+          try {
+            const keyUsage: any = issuerCert.getExtension('keyUsage');
+            const canSign = keyUsage?.keyCertSign ?? keyUsage?.value?.keyCertSign ?? false;
+            if (!canSign) {
+              issues.push(`Issuer certificate cannot sign other certificates: ${issuerCert.subject.getField('CN')?.value || 'Unknown'}`);
+            }
+          } catch {}
           
           chain.push({ cert: issuerCert, status: 'valid' });
           currentCert = issuerCert;
@@ -567,7 +577,8 @@ export class X509Utils {
       }
       
     } catch (error) {
-      issues.push(`Error parsing certificate: ${error instanceof Error ? error.message : String(error)}`);
+      // Avoid leaking internal forge errors
+      issues.push('Failed to parse or validate the certificate. Please ensure it is a single valid PEM certificate.');
     }
     
     return {
