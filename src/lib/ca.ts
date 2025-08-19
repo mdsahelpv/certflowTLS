@@ -64,7 +64,7 @@ export class CAService {
     return { caId: created.id, csr, privateKey: keyPair.privateKey };
   }
 
-  static async uploadCACertificate(certificate: string, caId?: string): Promise<void> {
+  static async uploadCACertificate(certificate: string, caId?: string, certificateChain?: string): Promise<void> {
     const caConfig = caId
       ? await db.cAConfig.findUnique({ where: { id: caId } })
       : await db.cAConfig.findFirst();
@@ -78,6 +78,7 @@ export class CAService {
       where: { id: caConfig.id },
       data: {
         certificate,
+        certificateChain: certificateChain || undefined,
         status: CAStatus.ACTIVE,
         validFrom: notBefore,
         validTo: notAfter,

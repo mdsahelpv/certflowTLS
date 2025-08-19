@@ -14,7 +14,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { certificate, caId } = await request.json();
+    const { certificate, certificateChain, caId } = await request.json();
     
     if (!certificate) {
       return NextResponse.json(
@@ -23,7 +23,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // Basic certificate validation
+    // Basic certificate validation (single PEM or bundle first cert)
     if (!certificate.includes('-----BEGIN CERTIFICATE-----') || 
         !certificate.includes('-----END CERTIFICATE-----')) {
       return NextResponse.json(
@@ -31,9 +31,18 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
+    if (certificateChain) {
+      if (!certificateChain.includes('-----BEGIN CERTIFICATE-----') ||
+          !certificateChain.includes('-----END CERTIFICATE-----')) {
+        return NextResponse.json(
+          { error: 'Invalid certificate chain format. Must be PEM bundle.' },
+          { status: 400 }
+        );
+      }
+    }
 
     // Upload certificate to specific CA
-    await CAService.uploadCACertificate(certificate, caId);
+    await CAService.uploadCACertificate(certificate, caId, certificateChain);
 
     return NextResponse.json({ success: true });
   } catch (error) {
