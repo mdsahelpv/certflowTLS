@@ -313,6 +313,14 @@ export default function CASetupPage() {
                               >
                                 Delete
                               </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="ml-2"
+                                onClick={() => router.push(`/ca/${ca.id}`)}
+                              >
+                                View
+                              </Button>
                               {ca.status === 'INITIALIZING' && (
                                 <Button
                                   size="sm"
