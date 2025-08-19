@@ -8,15 +8,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { 
-  Shield, 
-  CheckCircle, 
-  XCircle, 
+import {
+  Shield,
+  CheckCircle,
+  XCircle,
   AlertTriangle,
-  Clock,
   FileText,
   RefreshCw,
-  Download
 } from 'lucide-react';
 
 interface ValidationResult {
@@ -33,18 +31,18 @@ interface ValidationResult {
   expiration: {
     expired: boolean;
     daysUntilExpiry: number;
-    validFrom: Date;
-    validTo: Date;
+    validFrom: Date | string;
+    validTo: Date | string;
   };
   signature: {
     verified: boolean;
     issuer: string;
   };
-  lastValidated: Date;
+  lastValidated: Date | string;
 }
 
 export default function CertificateValidationPage() {
-  const { session, isAuthenticated, isLoading } = useAuth('/auth/signin');
+  const { isAuthenticated, isLoading } = useAuth('/auth/signin');
   const [certificatePem, setCertificatePem] = useState('');
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
   const [isValidating, setIsValidating] = useState(false);
@@ -67,6 +65,11 @@ export default function CertificateValidationPage() {
       setError('Please enter a certificate PEM');
       return;
     }
+    // Basic PEM guard
+    if (!/-----BEGIN CERTIFICATE-----[\s\S]+-----END CERTIFICATE-----/.test(certificatePem.trim())) {
+      setError('Input does not look like a valid PEM certificate. Please paste a correct certificate.');
+      return;
+    }
 
     setIsValidating(true);
     setError('');
@@ -75,56 +78,34 @@ export default function CertificateValidationPage() {
     try {
       const response = await fetch('/api/certificates/validate', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           certificatePem: certificatePem.trim(),
-          options: {
-            checkExpiration: true,
-            checkRevocation: true,
-            maxChainLength: 10
-          }
+          options: { checkExpiration: true, checkRevocation: true, maxChainLength: 10 },
         }),
       });
 
       const data = await response.json();
-
       if (response.ok) {
         setValidationResult(data.result);
       } else {
         setError(data.error || 'Validation failed');
       }
-    } catch (error) {
+    } catch (e) {
       setError('An error occurred during validation');
     } finally {
       setIsValidating(false);
     }
   };
 
-  const getStatusIcon = (isValid: boolean) => {
-    if (isValid) {
-      return <CheckCircle className="h-6 w-6 text-green-500" />;
-    }
-    return <XCircle className="h-6 w-6 text-red-500" />;
-  };
-
-  const getStatusBadge = (isValid: boolean) => {
-    if (isValid) {
-      return <Badge className="bg-green-100 text-green-800">Valid</Badge>;
-    }
-    return <Badge variant="destructive">Invalid</Badge>;
-  };
+  const getStatusIcon = (ok: boolean) => (ok ? <CheckCircle className="h-6 w-6 text-green-500" /> : <XCircle className="h-6 w-6 text-red-500" />);
+  const getStatusBadge = (ok: boolean) => (ok ? <Badge className="bg-green-100 text-green-800">Valid</Badge> : <Badge variant="destructive">Invalid</Badge>);
 
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-          Certificate Validation
-        </h1>
-        <p className="text-gray-600 dark:text-gray-400">
-          Validate certificates with full chain validation, signature verification, and expiration checking
-        </p>
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Certificate Validation</h1>
+        <p className="text-gray-600 dark:text-gray-400">Validate certificates with full chain validation, signature verification, and expiration checking</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -135,34 +116,26 @@ export default function CertificateValidationPage() {
               <FileText className="h-5 w-5" />
               Certificate Input
             </CardTitle>
-            <CardDescription>
-              Paste the certificate PEM to validate
-            </CardDescription>
+            <CardDescription>Paste the certificate PEM to validate</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
               <Label htmlFor="certificate">Certificate PEM</Label>
               <Textarea
                 id="certificate"
-                placeholder="-----BEGIN CERTIFICATE-----&#10;MII...&#10;-----END CERTIFICATE-----"
+                placeholder="-----BEGIN CERTIFICATE-----\nMII...\n-----END CERTIFICATE-----"
                 value={certificatePem}
                 onChange={(e) => setCertificatePem(e.target.value)}
                 rows={10}
                 className="font-mono text-sm"
               />
             </div>
-
             {error && (
               <Alert variant="destructive">
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
-
-            <Button 
-              onClick={handleValidation} 
-              disabled={isValidating || !certificatePem.trim()}
-              className="w-full"
-            >
+            <Button onClick={handleValidation} disabled={isValidating || !certificatePem.trim()} className="w-full">
               {isValidating ? (
                 <>
                   <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
@@ -185,15 +158,11 @@ export default function CertificateValidationPage() {
               <Shield className="h-5 w-5" />
               Validation Results
             </CardTitle>
-            <CardDescription>
-              Certificate validation status and details
-            </CardDescription>
+            <CardDescription>Certificate validation status and details</CardDescription>
           </CardHeader>
           <CardContent>
             {!validationResult ? (
-              <div className="text-center text-gray-500 py-8">
-                Enter a certificate and click validate to see results
-              </div>
+              <div className="text-center text-gray-500 py-8">Enter a certificate and click validate to see results</div>
             ) : (
               <div className="space-y-6">
                 {/* Overall Status */}
@@ -243,17 +212,17 @@ export default function CertificateValidationPage() {
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
                       <span>Status:</span>
-                      <Badge variant={validationResult.expiration.expired ? "destructive" : "default"}>
+                      <Badge variant={validationResult.expiration.expired ? 'destructive' : 'default'}>
                         {validationResult.expiration.expired ? 'Expired' : 'Valid'}
                       </Badge>
                     </div>
                     <div className="flex items-center justify-between text-sm">
                       <span>Valid From:</span>
-                      <span>{validationResult.expiration.validFrom.toLocaleDateString()}</span>
+                      <span>{new Date(validationResult.expiration.validFrom as any).toLocaleDateString()}</span>
                     </div>
                     <div className="flex items-center justify-between text-sm">
                       <span>Valid To:</span>
-                      <span>{validationResult.expiration.validTo.toLocaleDateString()}</span>
+                      <span>{new Date(validationResult.expiration.validTo as any).toLocaleDateString()}</span>
                     </div>
                     {!validationResult.expiration.expired && (
                       <div className="flex items-center justify-between text-sm">
@@ -270,7 +239,7 @@ export default function CertificateValidationPage() {
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
                       <span>Status:</span>
-                      <Badge variant={validationResult.signature.verified ? "default" : "destructive"}>
+                      <Badge variant={validationResult.signature.verified ? 'default' : 'destructive'}>
                         {validationResult.signature.verified ? 'Verified' : 'Failed'}
                       </Badge>
                     </div>
@@ -298,7 +267,7 @@ export default function CertificateValidationPage() {
 
                 {/* Last Validated */}
                 <div className="text-sm text-gray-500 text-center">
-                  Last validated: {validationResult.lastValidated.toLocaleString()}
+                  Last validated: {new Date(validationResult.lastValidated as any).toLocaleString()}
                 </div>
               </div>
             )}
@@ -308,3 +277,4 @@ export default function CertificateValidationPage() {
     </div>
   );
 }
+
