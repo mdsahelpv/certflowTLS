@@ -2,6 +2,7 @@ import { db } from '@/lib/db';
 import { CAStatus, KeyAlgorithm, CertificateType, CertificateStatus } from '@prisma/client';
 import { Encryption, CertificateUtils, CSRUtils, CRLUtils, X509Utils } from './crypto';
 import { AuditService } from './audit';
+import forge from 'node-forge';
 
 export interface CAConfigData {
   name?: string;
@@ -137,7 +138,6 @@ export class CAService {
       // If SANs are not provided, attempt to extract from CSR
       try {
         if (!data.sans || data.sans.length === 0) {
-          const forge = require('node-forge');
           const req = forge.pki.certificationRequestFromPem(csr);
           const extReq = req.getAttribute({ name: 'extensionRequest' });
           if (extReq && extReq.extensions) {
