@@ -561,13 +561,29 @@ export default function CASetupPage() {
               <CardContent className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="certificate">Signed Certificate (PEM format)</Label>
+                  <input
+                    type="file"
+                    accept=".pem,.crt,.cer,.txt,application/x-x509-ca-cert,application/x-pem-file,text/plain"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      try {
+                        const text = await file.text();
+                        const el = document.getElementById('certificate') as HTMLTextAreaElement | null;
+                        if (el) el.value = text;
+                      } catch (err) {
+                        setError('Failed to read file');
+                      }
+                    }}
+                    className="block w-full text-sm"
+                  />
                   <Textarea
                     id="certificate"
                     placeholder="-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----"
                     rows={15}
                     className="font-mono text-xs"
                     onChange={(e) => {
-                      // Will be used when implementing upload
+                      // keep textarea as the source of truth
                     }}
                   />
                 </div>
