@@ -359,7 +359,7 @@ export default function IssueCertificatePage() {
                     <Label>CSR Mode</Label>
                     <Tabs value={csrMode} onValueChange={(value) => setCsrMode(value as 'generate' | 'upload')}>
                       <TabsList className="grid w-full grid-cols-2">
-                        <TabsTrigger value="generate">Generate CSR</TabsTrigger>
+                        <TabsTrigger value="generate">Issue Certificate</TabsTrigger>
                         <TabsTrigger value="upload">Upload CSR</TabsTrigger>
                       </TabsList>
                       

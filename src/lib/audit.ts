@@ -57,7 +57,7 @@ export class AuditService {
     }
 
     if (filters?.username) {
-      where.username = { contains: filters.username, mode: 'insensitive' };
+      where.username = { contains: filters.username };
     }
 
     if (filters?.startDate || filters?.endDate) {
