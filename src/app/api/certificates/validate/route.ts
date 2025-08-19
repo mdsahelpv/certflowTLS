@@ -11,11 +11,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check permissions
-    const permissions = (session.user as any).permissions || [];
-    if (!permissions.includes('certificate:validate')) {
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
-    }
+    // No additional permission required; any authenticated user may validate certificates
 
     const body = await request.json();
     const { certificatePem, options } = body;
@@ -49,11 +45,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check permissions
-    const permissions = (session.user as any).permissions || [];
-    if (!permissions.includes('certificate:validate')) {
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
-    }
+    // No additional permission required; any authenticated user may access validation endpoints
 
     const { searchParams } = new URL(request.url);
     const action = searchParams.get('action');
