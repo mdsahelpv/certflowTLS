@@ -57,6 +57,7 @@ export default function CASetupPage() {
     keySize: 2048,
     curve: 'P-256'
   });
+  const [selectedCAId, setSelectedCAId] = useState<string>('');
 
   // Form fields for DN
   const [dnFields, setDnFields] = useState({
@@ -110,6 +111,7 @@ export default function CASetupPage() {
 
       const data: CAResponse = await response.json();
       setCaResponse(data);
+      setSelectedCAId(data.caId);
       setStep('generate');
       setSuccess('CA CSR generated successfully!');
     } catch (error) {
@@ -130,7 +132,7 @@ export default function CASetupPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           certificate,
-          caId: caResponse?.caId,
+          caId: selectedCAId || caResponse?.caId,
           certificateChain: (document.getElementById('certificate-chain') as HTMLTextAreaElement)?.value || undefined,
         })
       });
@@ -311,6 +313,20 @@ export default function CASetupPage() {
                               >
                                 Delete
                               </Button>
+                              {ca.status === 'INITIALIZING' && (
+                                <Button
+                                  size="sm"
+                                  className="ml-2"
+                                  onClick={() => {
+                                    setSelectedCAId(ca.id);
+                                    setStep('upload');
+                                    setSuccess('Ready to upload the signed certificate');
+                                    setTimeout(() => setSuccess(''), 1500);
+                                  }}
+                                >
+                                  Upload Signed Certificate
+                                </Button>
+                              )}
                             </TableCell>
                           </TableRow>
                         ))}
@@ -496,155 +512,76 @@ export default function CASetupPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label>CSR Content</Label>
-                    <div className="flex gap-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => caResponse && copyToClipboard(caResponse.csr)}
-                      >
-                        <Copy className="h-4 w-4 mr-1" />
-                        Copy
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={downloadCSR}
-                      >
-                        <Download className="h-4 w-4 mr-1" />
-                        Download
-                      </Button>
-                    </div>
+                  <div className="flex items-center">
+                    <Key className="h-5 w-5 text-gray-500 dark:text-gray-400 mr-2" />
+                    <Label>Private Key</Label>
+                  </div>
+                  <Textarea
+                    value={caResponse?.privateKey || ''}
+                    readOnly
+                    rows={10}
+                    className="bg-gray-100 dark:bg-gray-700 text-sm"
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => copyToClipboard(caResponse?.privateKey || '')}
+                    className="w-full"
+                    disabled={!caResponse?.privateKey}
+                  >
+                    <Copy className="h-4 w-4 mr-2" />
+                    Copy Private Key
+                  </Button>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center">
+                    <FileText className="h-5 w-5 text-gray-500 dark:text-gray-400 mr-2" />
+                    <Label>Certificate Signing Request (CSR)</Label>
                   </div>
                   <Textarea
                     value={caResponse?.csr || ''}
                     readOnly
-                    rows={15}
-                    className="font-mono text-xs"
+                    rows={10}
+                    className="bg-gray-100 dark:bg-gray-700 text-sm"
                   />
-                </div>
-
-                <Alert>
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>
-                    <strong>Important:</strong> Keep the private key secure! This key will be used to sign certificates.
-                    Download the CSR and sign it with your root CA, then return to upload the signed certificate.
-                  </AlertDescription>
-                </Alert>
-
-                <div className="flex gap-4">
-                  <Button 
-                    variant="outline" 
-                    onClick={() => setStep('config')}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={downloadCSR}
+                    className="w-full"
+                    disabled={!caResponse?.csr}
                   >
-                    Back to Configuration
+                    <Download className="h-4 w-4 mr-2" />
+                    Download CSR
                   </Button>
-                  <Button 
-                    onClick={() => setStep('upload')}
-                    className="flex-1"
-                  >
-                    <Upload className="mr-2 h-4 w-4" />
-                    Upload Signed Certificate
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="upload" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Upload className="h-5 w-5" />
-                  Upload Signed CA Certificate
-                </CardTitle>
-                <CardDescription>
-                  Upload the certificate that was signed by your root CA
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="certificate">Signed Certificate (PEM format)</Label>
-                  <input
-                    type="file"
-                    accept=".pem,.crt,.cer,.txt,application/x-x509-ca-cert,application/x-pem-file,text/plain"
-                    onChange={async (e) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
-                      try {
-                        const text = await file.text();
-                        const el = document.getElementById('certificate') as HTMLTextAreaElement | null;
-                        if (el) el.value = text;
-                      } catch (err) {
-                        setError('Failed to read file');
-                      }
-                    }}
-                    className="block w-full text-sm"
-                  />
-                  <Textarea
-                    id="certificate"
-                    placeholder="-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----"
-                    rows={15}
-                    className="font-mono text-xs"
-                    onChange={(e) => {
-                      // keep textarea as the source of truth
-                    }}
-                  />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="certificate-chain">Certificate Chain (PEM bundle, optional)</Label>
-                  <input
-                    type="file"
-                    accept=".pem,.crt,.cer,.txt,application/x-x509-ca-cert,application/x-pem-file,text/plain"
-                    onChange={async (e) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
-                      try {
-                        const text = await file.text();
-                        const el = document.getElementById('certificate-chain') as HTMLTextAreaElement | null;
-                        if (el) el.value = text;
-                      } catch (err) {
-                        setError('Failed to read chain file');
-                      }
-                    }}
-                    className="block w-full text-sm"
-                  />
+                  <div className="flex items-center">
+                    <Upload className="h-5 w-5 text-gray-500 dark:text-gray-400 mr-2" />
+                    <Label>Upload Signed Certificate</Label>
+                  </div>
                   <Textarea
                     id="certificate-chain"
-                    placeholder="-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----\n-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----"
+                    placeholder="Paste the signed certificate chain (root CA + intermediate CA + leaf certificate) here."
                     rows={10}
-                    className="font-mono text-xs"
+                    className="bg-gray-100 dark:bg-gray-700 text-sm"
                   />
-                </div>
-
-                <div className="flex gap-4">
-                  <Button 
-                    variant="outline" 
-                    onClick={() => setStep('generate')}
-                  >
-                    Back to CSR
-                  </Button>
-                  <Button 
-                    onClick={() => {
-                      const certificate = (document.getElementById('certificate') as HTMLTextAreaElement)?.value;
-                      if (certificate) {
-                        handleUploadCertificate(certificate);
-                      }
-                    }}
-                    disabled={isLoading}
-                    className="flex-1"
+                  <Button
+                    onClick={() => handleUploadCertificate((document.getElementById('certificate-chain') as HTMLTextAreaElement)?.value || '')}
+                    disabled={isLoading || !caResponse?.csr || !caResponse?.privateKey}
+                    className="w-full"
                   >
                     {isLoading ? (
                       <>
                         <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                        Uploading...
+                        Uploading Certificate...
                       </>
                     ) : (
                       <>
-                        <CheckCircle className="mr-2 h-4 w-4" />
-                        Complete Setup
+                        <Upload className="mr-2 h-4 w-4" />
+                        Upload Signed Certificate
                       </>
                     )}
                   </Button>
