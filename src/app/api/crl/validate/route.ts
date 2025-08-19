@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     // Check authentication
     const session = await getServerSession(authOptions);
@@ -57,8 +57,10 @@ export async function GET() {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
     }
 
-    // Get CRL statistics
-    const statistics = await CAService.getCRLStatistics();
+    // Get CRL statistics (optionally scoped by caId)
+    const { searchParams } = new URL(request.url);
+    const caId = searchParams.get('caId') || undefined;
+    const statistics = await CAService.getCRLStatistics(caId);
 
     return NextResponse.json({
       success: true,

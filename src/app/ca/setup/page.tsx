@@ -36,6 +36,7 @@ interface CAConfigData {
 }
 
 interface CAResponse {
+  caId: string;
   csr: string;
   privateKey: string;
 }
@@ -127,7 +128,7 @@ export default function CASetupPage() {
       const response = await fetch('/api/ca/upload-certificate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ certificate })
+        body: JSON.stringify({ certificate, caId: caResponse?.caId })
       });
 
       if (!response.ok) {
