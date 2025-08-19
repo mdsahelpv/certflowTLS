@@ -1,3 +1,4 @@
+![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/markrubio18/CER?utm_source=oss&utm_medium=github&utm_campaign=markrubio18%2FCER&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
 # Certificate Authority Management System
 
 A comprehensive enterprise-grade Certificate Authority (CA) management solution with full PKI capabilities, audit logging, and role-based access control. Built with Next.js 15, TypeScript, and modern web technologies.
