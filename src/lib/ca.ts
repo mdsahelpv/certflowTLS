@@ -299,8 +299,8 @@ export class CAService {
       },
     });
 
-    // Update CRL
-    await this.updateCRL();
+    // Update CRL for the certificate's CA
+    await this.updateCRL(certificate.caId || undefined);
   }
 
   static async generateCRL(caId?: string): Promise<string> {
@@ -311,11 +311,12 @@ export class CAService {
       throw new Error('CA is not active');
     }
 
-    // Get all revoked certificates
+    // Get revoked certificates for this CA
     const revocations = await db.certificateRevocation.findMany({
       include: {
         certificate: true,
       },
+      where: { certificate: { caId: caConfig.id } as any },
     });
 
     const revokedCertificates = revocations.map(rev => ({
@@ -405,6 +406,7 @@ export class CAService {
         revocationDate: {
           gt: lastRevocationDate,
         },
+        certificate: { caId: caConfig.id } as any,
       },
       include: {
         certificate: true,
@@ -552,7 +554,9 @@ export class CAService {
     });
 
     // Get total revoked certificates
-    const totalRevoked = await db.certificateRevocation.count();
+    const totalRevoked = await db.certificateRevocation.count({
+      where: { certificate: { caId: caConfig.id } as any },
+    });
 
     // Find last full CRL and delta CRL
     let lastFullCRL: any = null;
