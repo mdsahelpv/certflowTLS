@@ -105,7 +105,8 @@ export class CertificateExporter {
     logs: any[], 
     format: 'CSV' | 'JSON' = 'CSV'
   ): Promise<Blob> {
-    switch (format) {
+    const normalized = format.toUpperCase();
+    switch (normalized) {
       case 'CSV':
         return this.exportToCSV(logs);
       case 'JSON':
