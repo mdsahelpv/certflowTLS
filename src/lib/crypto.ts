@@ -520,10 +520,7 @@ export class X509Utils {
         }
       }
       
-      // Verify certificate signature
-      if (!cert.verify(cert.publicKey)) {
-        issues.push('Certificate signature verification failed');
-      }
+      // Skip self-signature verification; issuer verification is handled below
       
       // Build and validate certificate chain
       const maxChainLength = options.maxChainLength || 10;
@@ -605,10 +602,16 @@ export class X509Utils {
   }
 
   // Verify certificate signature
-  static verifyCertificateSignature(certificatePem: string, issuerPublicKeyPem: string): boolean {
+  static verifyCertificateSignature(certificatePem: string, issuerPublicKeyOrCertPem: string): boolean {
     try {
       const cert = forge.pki.certificateFromPem(certificatePem);
-      const issuerPublicKey = forge.pki.publicKeyFromPem(issuerPublicKeyPem);
+      let issuerPublicKey: any;
+      if (/-----BEGIN CERTIFICATE-----/.test(issuerPublicKeyOrCertPem)) {
+        const issuerCert = forge.pki.certificateFromPem(issuerPublicKeyOrCertPem);
+        issuerPublicKey = issuerCert.publicKey;
+      } else {
+        issuerPublicKey = forge.pki.publicKeyFromPem(issuerPublicKeyOrCertPem);
+      }
       return cert.verify(issuerPublicKey);
     } catch (error) {
       return false;
