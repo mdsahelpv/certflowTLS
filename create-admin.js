@@ -5,8 +5,12 @@ const prisma = new PrismaClient();
 
 async function createAdmin() {
   try {
-    const adminUsername = process.env.ADMIN_USERNAME || 'admin';
-    const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
+    const adminUsername = process.env.ADMIN_USERNAME;
+    const adminPassword = process.env.ADMIN_PASSWORD;
+    if (!adminUsername || !adminPassword) {
+      console.warn('ADMIN_USERNAME or ADMIN_PASSWORD not set; skipping admin creation');
+      return;
+    }
     const bcryptRounds = parseInt(process.env.BCRYPT_ROUNDS || '12', 10);
 
     const existing = await prisma.user.findUnique({

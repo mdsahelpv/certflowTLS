@@ -24,8 +24,13 @@ export class SystemInitializer {
 
   private static async createDefaultAdmin(): Promise<void> {
     try {
-      const adminUsername = process.env.ADMIN_USERNAME || 'admin';
-      const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
+      const adminUsername = process.env.ADMIN_USERNAME;
+      const adminPassword = process.env.ADMIN_PASSWORD;
+
+      if (!adminUsername || !adminPassword) {
+        console.warn('ADMIN_USERNAME or ADMIN_PASSWORD not set; skipping default admin creation');
+        return;
+      }
 
       const existingAdmin = await db.user.findUnique({
         where: { username: adminUsername },
