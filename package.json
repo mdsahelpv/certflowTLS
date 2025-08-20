@@ -7,12 +7,18 @@
     "build": "next build",
     "start": "PORT=4000 NODE_ENV=production tsx server.ts 2>&1 | tee server.log",
     "lint": "next lint",
-    "setup": "node -e \"const fs = require('fs'); const path = require('path'); if (!fs.existsSync('.env')) { fs.copyFileSync('env.example', '.env'); console.log('Environment file created!'); } else { console.log('Environment file already exists'); } if (!fs.existsSync('db')) { fs.mkdirSync('db'); console.log('Database directory created!'); } console.log('Setup complete! Please edit .env file and run: npm run db:push');",
+    "setup": "node -e \"const fs = require('fs'); const path = require('path'); if (!fs.existsSync('.env')) { fs.copyFileSync('env.sqlite', '.env'); console.log('SQLite environment file created!'); } else { console.log('Environment file already exists'); } if (!fs.existsSync('db')) { fs.mkdirSync('db'); console.log('Database directory created!'); } console.log('Setup complete! Please edit .env file and run: npm run db:push');",
+    "setup:postgresql": "node -e \"const fs = require('fs'); if (!fs.existsSync('.env')) { fs.copyFileSync('env.postgresql', '.env'); console.log('PostgreSQL environment file created!'); } else { console.log('Environment file already exists'); } console.log('PostgreSQL setup complete! Please edit .env file and run: npm run db:push:postgresql');",
+    "setup:sqlite": "node -e \"const fs = require('fs'); if (!fs.existsSync('.env')) { fs.copyFileSync('env.sqlite', '.env'); console.log('SQLite environment file created!'); } else { console.log('Environment file already exists'); } if (!fs.existsSync('db')) { fs.mkdirSync('db'); console.log('Database directory created!'); } console.log('SQLite setup complete! Please edit .env file and run: npm run db:push:sqlite');",
     "db:push": "prisma db push",
+    "db:push:postgresql": "cp prisma/schema.prisma prisma/schema.prisma.backup && cp prisma/schema.prisma.psql prisma/schema.prisma && prisma db push && cp prisma/schema.prisma.backup prisma/schema.prisma",
+    "db:push:sqlite": "cp prisma/schema.prisma prisma/schema.prisma.backup && cp prisma/schema.sqlite prisma/schema.prisma && prisma db push && cp prisma/schema.prisma.backup prisma/schema.prisma",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:reset": "prisma migrate reset",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "db:studio:postgresql": "cp prisma/schema.prisma prisma/schema.prisma.backup && cp prisma/schema.prisma.psql prisma/schema.prisma && prisma studio && cp prisma/schema.prisma.backup prisma/schema.prisma",
+    "db:studio:sqlite": "cp prisma/schema.prisma prisma/schema.prisma.backup && cp prisma/schema.sqlite prisma/schema.prisma && prisma studio && cp prisma/schema.prisma.backup prisma/schema.prisma"
   },
   "prisma": {
     "schema": "prisma/schema.prisma"
