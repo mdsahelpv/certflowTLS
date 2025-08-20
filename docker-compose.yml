@@ -7,9 +7,6 @@ services:
       - "3000:3000"
     env_file:
       - env.docker
-    environment:
-      # Use container env expansion for DATABASE_URL (escape $ for Compose)
-      - DATABASE_URL=postgresql://$$POSTGRES_USER:$$POSTGRES_PASSWORD@postgres:5432/$$POSTGRES_DB
     volumes:
       - ./logs:/app/logs
     restart: unless-stopped
