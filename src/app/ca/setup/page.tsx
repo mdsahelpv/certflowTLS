@@ -61,12 +61,12 @@ export default function CASetupPage() {
 
   // Form fields for DN
   const [dnFields, setDnFields] = useState({
-    country: process.env.CA_COUNTRY || 'US',
-    state: process.env.CA_STATE || 'California',
-    locality: process.env.CA_LOCALITY || 'San Francisco',
-    organization: process.env.CA_ORGANIZATION || 'My Organization',
-    organizationalUnit: process.env.CA_ORGANIZATIONAL_UNIT || 'IT Department',
-    commonName: process.env.CA_COMMON_NAME || 'My CA'
+    country: process.env.NEXT_PUBLIC_CA_COUNTRY || 'US',
+    state: process.env.NEXT_PUBLIC_CA_STATE || 'California',
+    locality: process.env.NEXT_PUBLIC_CA_LOCALITY || 'San Francisco',
+    organization: process.env.NEXT_PUBLIC_CA_ORGANIZATION || 'My Organization',
+    organizationalUnit: process.env.NEXT_PUBLIC_CA_ORGANIZATIONAL_UNIT || 'IT Department',
+    commonName: process.env.NEXT_PUBLIC_CA_COMMON_NAME || 'My CA'
   });
 
   useEffect(() => {
