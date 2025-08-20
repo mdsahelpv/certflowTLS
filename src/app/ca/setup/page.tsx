@@ -589,22 +589,36 @@ export default function CASetupPage() {
               <CardContent className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="certificate">Signed Certificate (PEM format)</Label>
-                  <input
-                    type="file"
-                    accept=".pem,.crt,.cer,.txt,application/x-x509-ca-cert,application/x-pem-file,text/plain"
-                    onChange={async (e) => {
+                  <div
+                    className="border border-dashed rounded-md p-4 text-center hover:bg-muted/30 transition cursor-pointer"
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={async (e) => {
+                      e.preventDefault();
+                      const file = e.dataTransfer.files?.[0];
+                      if (!file) return;
+                      try {
+                        const text = await file.text();
+                        const el = document.getElementById('certificate') as HTMLTextAreaElement | null;
+                        if (el) el.value = text;
+                      } catch {
+                        setError('Failed to read file');
+                      }
+                    }}
+                    onClick={() => document.getElementById('certificate-file')?.click()}
+                  >
+                    <p className="text-sm text-muted-foreground">Drag and drop the certificate file here, or click to select</p>
+                    <Input id="certificate-file" type="file" accept=".pem,.crt,.cer,.txt,application/x-x509-ca-cert,application/x-pem-file,text/plain" className="hidden" onChange={async (e) => {
                       const file = e.target.files?.[0];
                       if (!file) return;
                       try {
                         const text = await file.text();
                         const el = document.getElementById('certificate') as HTMLTextAreaElement | null;
                         if (el) el.value = text;
-                      } catch (err) {
+                      } catch {
                         setError('Failed to read file');
                       }
-                    }}
-                    className="block w-full text-sm"
-                  />
+                    }} />
+                  </div>
                   <Textarea
                     id="certificate"
                     placeholder="-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----"
@@ -615,22 +629,36 @@ export default function CASetupPage() {
 
                 <div className="space-y-2">
                   <Label htmlFor="certificate-chain">Certificate Chain (PEM bundle, optional)</Label>
-                  <input
-                    type="file"
-                    accept=".pem,.crt,.cer,.txt,application/x-x509-ca-cert,application/x-pem-file,text/plain"
-                    onChange={async (e) => {
+                  <div
+                    className="border border-dashed rounded-md p-4 text-center hover:bg-muted/30 transition cursor-pointer"
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={async (e) => {
+                      e.preventDefault();
+                      const file = e.dataTransfer.files?.[0];
+                      if (!file) return;
+                      try {
+                        const text = await file.text();
+                        const el = document.getElementById('certificate-chain') as HTMLTextAreaElement | null;
+                        if (el) el.value = text;
+                      } catch {
+                        setError('Failed to read chain file');
+                      }
+                    }}
+                    onClick={() => document.getElementById('certificate-chain-file')?.click()}
+                  >
+                    <p className="text-sm text-muted-foreground">Drag and drop the chain file here, or click to select</p>
+                    <Input id="certificate-chain-file" type="file" accept=".pem,.crt,.cer,.txt,application/x-x509-ca-cert,application/x-pem-file,text/plain" className="hidden" onChange={async (e) => {
                       const file = e.target.files?.[0];
                       if (!file) return;
                       try {
                         const text = await file.text();
                         const el = document.getElementById('certificate-chain') as HTMLTextAreaElement | null;
                         if (el) el.value = text;
-                      } catch (err) {
+                      } catch {
                         setError('Failed to read chain file');
                       }
-                    }}
-                    className="block w-full text-sm"
-                  />
+                    }} />
+                  </div>
                   <Textarea
                     id="certificate-chain"
                     placeholder={"-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----\n-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----"}
