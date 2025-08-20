@@ -5,11 +5,23 @@ const prisma = new PrismaClient();
 
 async function createAdmin() {
   try {
-    const hashedPassword = await bcrypt.hash('admin123', 12);
+    const adminUsername = process.env.ADMIN_USERNAME || 'admin';
+    const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
+    const bcryptRounds = parseInt(process.env.BCRYPT_ROUNDS || '12', 10);
+
+    const existing = await prisma.user.findUnique({
+      where: { username: adminUsername },
+    });
+    if (existing) {
+      console.log(`Admin user '${adminUsername}' already exists. Skipping creation.`);
+      return;
+    }
+
+    const hashedPassword = await bcrypt.hash(adminPassword, bcryptRounds);
     
     const admin = await prisma.user.create({
       data: {
-        username: 'admin',
+        username: adminUsername,
         email: 'admin@localhost',
         password: hashedPassword,
         name: 'Default Administrator',
@@ -18,7 +30,7 @@ async function createAdmin() {
       },
     });
     
-    console.log('Admin user created successfully:', admin);
+    console.log(`Admin user '${adminUsername}' created successfully.`);
   } catch (error) {
     console.error('Error creating admin user:', error);
   } finally {

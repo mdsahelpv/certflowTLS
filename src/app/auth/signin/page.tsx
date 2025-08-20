@@ -147,10 +147,14 @@ function SignInContent() {
           </form>
         </Card>
 
-        <div className="text-center text-sm text-gray-600 dark:text-gray-400">
-          <p>Default credentials:</p>
-          <p className="font-mono">admin / admin123</p>
-        </div>
+        {process.env.NEXT_PUBLIC_ADMIN_USERNAME && process.env.NEXT_PUBLIC_ADMIN_PASSWORD ? (
+          <div className="text-center text-sm text-gray-600 dark:text-gray-400">
+            <p>Default credentials:</p>
+            <p className="font-mono">
+              {process.env.NEXT_PUBLIC_ADMIN_USERNAME} / {process.env.NEXT_PUBLIC_ADMIN_PASSWORD}
+            </p>
+          </div>
+        ) : null}
       </div>
     </div>
   );
