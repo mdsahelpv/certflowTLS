@@ -18,7 +18,13 @@
     "db:reset": "prisma migrate reset",
     "db:studio": "prisma studio",
     "db:studio:postgresql": "cp prisma/schema.prisma prisma/schema.prisma.backup && cp prisma/schema.prisma.psql prisma/schema.prisma && prisma studio && cp prisma/schema.prisma.backup prisma/schema.prisma",
-    "db:studio:sqlite": "cp prisma/schema.prisma prisma/schema.prisma.backup && cp prisma/schema.sqlite prisma/schema.prisma && prisma studio && cp prisma/schema.prisma.backup prisma/schema.prisma"
+    "db:studio:sqlite": "cp prisma/schema.prisma prisma/schema.prisma.backup && cp prisma/schema.sqlite prisma/schema.prisma && prisma studio && cp prisma/schema.prisma.backup prisma/schema.prisma",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:ci": "jest --ci --coverage --watchAll=false",
+    "test:debug": "node --inspect-brk node_modules/.bin/jest --runInBand",
+    "test:update": "jest --updateSnapshot"
   },
   "prisma": {
     "schema": "prisma/schema.prisma"
