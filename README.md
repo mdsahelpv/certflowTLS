@@ -27,6 +27,28 @@ A comprehensive enterprise-grade Certificate Authority (CA) management solution 
 - **Icons**: Lucide React
 - **Development**: Nodemon for hot-reload
 
+## 🚀 Quick Start
+
+### **Option 1: Development with SQLite (Recommended for Local Development)**
+```bash
+# Setup SQLite environment
+npm run setup:sqlite
+
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
+```
+
+### **Option 2: Production with PostgreSQL (Docker)**
+```bash
+# Start with Docker Compose
+docker-compose up --build
+```
+
+**📖 For detailed Docker setup instructions, see [DOCKER_QUICKSTART.md](./DOCKER_QUICKSTART.md)**
+
 ## 📋 Prerequisites
 
 Before you begin, ensure you have the following installed on your system:
@@ -35,6 +57,7 @@ Before you begin, ensure you have the following installed on your system:
 - **npm**: Version 8.0 or higher (comes with Node.js)
 - **Git**: For cloning the repository
 - **Code Editor**: VS Code or any preferred editor
+- **Docker & Docker Compose**: For production deployment (optional)
 
 ## 📦 Installation
 
@@ -60,61 +83,50 @@ This will install all required packages including:
 
 ### 3. Set Up Environment Variables
 
-Create a `.env` file in the root directory:
-
+#### **For SQLite Development:**
 ```bash
-cp env.example .env
+# Setup SQLite environment
+npm run setup:sqlite
 ```
 
-Edit the `.env` file with your configuration:
-
-```env
-# Database Configuration
-DATABASE_URL="file:./db/custom.db"
-
-# Application Configuration
-NODE_ENV="development"
-NEXTAUTH_URL="http://localhost:3000"
-NEXTAUTH_SECRET="your-super-secret-key-here"
-
-# Encryption Configuration
-ENCRYPTION_KEY="your-32-character-encryption-key-here"
-
-# CA Configuration
-CA_COUNTRY="US"
-CA_STATE="California"
-CA_LOCALITY="San Francisco"
-CA_ORGANIZATION="Your Organization"
-CA_ORGANIZATIONAL_UNIT="IT Department"
-CA_COMMON_NAME="Your CA Common Name"
-CA_EMAIL="ca@yourdomain.com"
-
-# Email Configuration (Optional)
-SMTP_HOST="smtp.gmail.com"
-SMTP_PORT=587
-SMTP_USER="your-email@gmail.com"
-SMTP_PASS="your-app-password"
-
-# Security Configuration
-BCRYPT_ROUNDS=12
-SESSION_MAX_AGE=86400
-RATE_LIMIT_WINDOW_MS=900000
-RATE_LIMIT_MAX_REQUESTS=100
+#### **For PostgreSQL Production:**
+```bash
+# Setup PostgreSQL environment
+npm run setup:postgresql
 ```
+
+#### **For Docker Production:**
+```bash
+# Copy Docker environment
+cp env.docker .env
+```
+
+Edit the `.env` file with your configuration. See `env.example` for all available options.
 
 **Important Security Notes:**
 - Generate a strong random secret for `NEXTAUTH_SECRET`
 - Use a 32-character key for `ENCRYPTION_KEY`
 - In production, use environment-specific values
+- Change default passwords in Docker environment
 
 ### 4. Set Up the Database
 
+#### **SQLite (Development):**
 ```bash
 # Create database directory if it doesn't exist
 mkdir -p db
 
 # Push the schema to the database
-npm run db:push
+npm run db:push:sqlite
+
+# (Optional) Generate Prisma client
+npx prisma generate
+```
+
+#### **PostgreSQL (Production):**
+```bash
+# Push the schema to the database
+npm run db:push:postgresql
 
 # (Optional) Generate Prisma client
 npx prisma generate
@@ -128,7 +140,7 @@ npm run build
 
 ## 🚀 Running the Application
 
-### Development Mode
+### Development Mode (SQLite)
 
 For development with hot-reload:
 
@@ -137,29 +149,26 @@ npm run dev
 ```
 
 The application will be available at:
-- **Main Application**: http://localhost:3000
-- **API Documentation**: http://localhost:3000/api/health
-- **Socket.IO**: ws://localhost:3000/api/socketio
+- **Main Application**: http://localhost:4000
+- **API Documentation**: http://localhost:4000/api/health
+- **Socket.IO**: ws://localhost:4000/api/socketio
 
-### Production Mode
+### Production Mode (PostgreSQL)
 
-For production deployment:
+#### **With Docker (Recommended):**
+```bash
+docker-compose up --build
+```
 
+#### **Without Docker:**
 ```bash
 npm start
 ```
 
-### Development with Custom Server
-
-The project includes a custom server with Socket.IO integration:
-
-```bash
-# Development with custom server
-npm run dev:server
-
-# Production with custom server
-npm run start:server
-```
+The application will be available at:
+- **Main Application**: http://localhost:3000
+- **API Documentation**: http://localhost:3000/api/health
+- **Socket.IO**: ws://localhost:3000/api/socketio
 
 ## 🎯 Initial Setup
 
