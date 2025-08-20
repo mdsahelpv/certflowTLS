@@ -241,7 +241,7 @@ export const authOptions: NextAuthOptions = {
   pages: {
     signIn: '/auth/signin',
   },
-  secret: process.env.NEXTAUTH_SECRET,
+  secret: process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET,
   debug: process.env.NEXTAUTH_DEBUG === 'true' || (process.env.NODE_ENV === 'development' && process.env.NEXTAUTH_DEBUG !== 'false'),
 };
 
