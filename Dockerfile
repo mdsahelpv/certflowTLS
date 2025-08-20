@@ -31,6 +31,9 @@ ENV NODE_ENV production
 # Uncomment the following line in case you want to disable telemetry during runtime.
 # ENV NEXT_TELEMETRY_DISABLED 1
 
+# Install PostgreSQL client tools for health checks and database initialization
+RUN apk add --no-cache postgresql-client curl
+
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
@@ -59,5 +62,5 @@ ENV PORT 3000
 # set hostname to localhost
 ENV HOSTNAME "0.0.0.0"
 
-# Run the custom server (Socket.IO enabled)
+# Default command (can be overridden by docker-compose)
 CMD ["npx", "tsx", "server.ts"]
