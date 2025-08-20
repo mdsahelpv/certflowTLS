@@ -607,13 +607,22 @@ export default function CASetupPage() {
                     onClick={() => document.getElementById('certificate-file')?.click()}
                   >
                     <p className="text-sm text-muted-foreground">Drag and drop the certificate file here, or click to select</p>
-                    <Input id="certificate-file" type="file" accept=".pem,.crt,.cer,.txt,application/x-x509-ca-cert,application/x-pem-file,text/plain" className="hidden" onChange={async (e) => {
+                    <Input id="certificate-file" type="file" accept=".pem,.crt,.cer,.der,.p7b,.txt,application/x-x509-ca-cert,application/x-pem-file,application/x-pkcs7-certificates,text/plain" className="hidden" onChange={async (e) => {
                       const file = e.target.files?.[0];
                       if (!file) return;
                       try {
-                        const text = await file.text();
-                        const el = document.getElementById('certificate') as HTMLTextAreaElement | null;
-                        if (el) el.value = text;
+                        if (file.type === 'application/x-x509-ca-cert' || file.name.toLowerCase().endsWith('.der')) {
+                          // Send as base64 via hidden input
+                          const buf = new Uint8Array(await file.arrayBuffer());
+                          (document.getElementById('certificate') as HTMLTextAreaElement).value = `__B64_DER__:${btoa(String.fromCharCode(...buf))}`;
+                        } else if (file.type === 'application/x-pkcs7-certificates' || file.name.toLowerCase().endsWith('.p7b')) {
+                          const buf = new Uint8Array(await file.arrayBuffer());
+                          (document.getElementById('certificate') as HTMLTextAreaElement).value = `__B64_P7B__:${btoa(String.fromCharCode(...buf))}`;
+                        } else {
+                          const text = await file.text();
+                          const el = document.getElementById('certificate') as HTMLTextAreaElement | null;
+                          if (el) el.value = text;
+                        }
                       } catch {
                         setError('Failed to read file');
                       }
@@ -647,13 +656,21 @@ export default function CASetupPage() {
                     onClick={() => document.getElementById('certificate-chain-file')?.click()}
                   >
                     <p className="text-sm text-muted-foreground">Drag and drop the chain file here, or click to select</p>
-                    <Input id="certificate-chain-file" type="file" accept=".pem,.crt,.cer,.txt,application/x-x509-ca-cert,application/x-pem-file,text/plain" className="hidden" onChange={async (e) => {
+                    <Input id="certificate-chain-file" type="file" accept=".pem,.crt,.cer,.der,.p7b,.txt,application/x-x509-ca-cert,application/x-pem-file,application/x-pkcs7-certificates,text/plain" className="hidden" onChange={async (e) => {
                       const file = e.target.files?.[0];
                       if (!file) return;
                       try {
-                        const text = await file.text();
-                        const el = document.getElementById('certificate-chain') as HTMLTextAreaElement | null;
-                        if (el) el.value = text;
+                        if (file.type === 'application/x-x509-ca-cert' || file.name.toLowerCase().endsWith('.der')) {
+                          const buf = new Uint8Array(await file.arrayBuffer());
+                          (document.getElementById('certificate-chain') as HTMLTextAreaElement).value = `__B64_DER__:${btoa(String.fromCharCode(...buf))}`;
+                        } else if (file.type === 'application/x-pkcs7-certificates' || file.name.toLowerCase().endsWith('.p7b')) {
+                          const buf = new Uint8Array(await file.arrayBuffer());
+                          (document.getElementById('certificate-chain') as HTMLTextAreaElement).value = `__B64_P7B__:${btoa(String.fromCharCode(...buf))}`;
+                        } else {
+                          const text = await file.text();
+                          const el = document.getElementById('certificate-chain') as HTMLTextAreaElement | null;
+                          if (el) el.value = text;
+                        }
                       } catch {
                         setError('Failed to read chain file');
                       }
@@ -675,10 +692,53 @@ export default function CASetupPage() {
                     Back to CSR
                   </Button>
                   <Button 
-                    onClick={() => {
-                      const certificate = (document.getElementById('certificate') as HTMLTextAreaElement)?.value;
-                      if (certificate) {
-                        handleUploadCertificate(certificate);
+                    onClick={async () => {
+                      const val = (document.getElementById('certificate') as HTMLTextAreaElement)?.value;
+                      const chainVal = (document.getElementById('certificate-chain') as HTMLTextAreaElement)?.value;
+                      if (!val) return;
+                      if (val.startsWith('__B64_DER__:') || val.startsWith('__B64_P7B__:') || chainVal?.startsWith('__B64_')) {
+                        // Use extended endpoint payload
+                        const certIsDer = val.startsWith('__B64_DER__:');
+                        const certIsP7b = val.startsWith('__B64_P7B__:');
+                        const chainIsDer = chainVal?.startsWith('__B64_DER__:');
+                        const chainIsP7b = chainVal?.startsWith('__B64_P7B__:');
+                        const payload: any = { caId: selectedCAId || caResponse?.caId };
+                        if (certIsDer || certIsP7b) {
+                          payload.certificateBinary = val.split(':', 2)[1];
+                          payload.certificateBinaryFormat = certIsDer ? 'der' : 'p7b';
+                        } else {
+                          payload.certificate = val;
+                        }
+                        if (chainVal) {
+                          if (chainIsDer || chainIsP7b) {
+                            payload.chainBinary = chainVal.split(':', 2)[1];
+                            payload.chainBinaryFormat = chainIsDer ? 'der' : 'p7b';
+                          } else {
+                            payload.certificateChain = chainVal;
+                          }
+                        }
+                        setIsLoading(true);
+                        setError('');
+                        setSuccess('');
+                        try {
+                          const response = await fetch('/api/ca/upload-certificate', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                          });
+                          if (!response.ok) {
+                            const errorData = await response.json();
+                            throw new Error(errorData.error || 'Failed to upload certificate');
+                          }
+                          setSuccess('CA certificate uploaded successfully!');
+                          setTimeout(() => { router.push('/dashboard'); }, 2000);
+                        } catch (error) {
+                          setError(error instanceof Error ? error.message : 'Failed to upload certificate');
+                        } finally {
+                          setIsLoading(false);
+                        }
+                      } else {
+                        handleUploadCertificate(val);
                       }
                     }}
                     disabled={isLoading}
