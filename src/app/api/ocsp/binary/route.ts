@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import forge from 'node-forge';
+import { db } from '@/lib/db';
+import { buildBasicOCSPResponseRSA } from '@/lib/ocsp';
 
 export async function POST(request: NextRequest) {
 	const contentType = request.headers.get('content-type') || '';
@@ -9,7 +11,7 @@ export async function POST(request: NextRequest) {
 	try {
 		const buf = new Uint8Array(await request.arrayBuffer());
 		const asn1 = forge.asn1.fromDer(forge.util.createBuffer(buf as any));
-		// Best-effort extraction of the first INTEGER value which should be the cert serial
+		// Heuristic extraction of serial number
 		let serialHex: string | null = null;
 		(function visit(node: any) {
 			if (!node || serialHex) return;
@@ -23,10 +25,34 @@ export async function POST(request: NextRequest) {
 				for (const child of node.value) visit(child);
 			}
 		})(asn1);
-		// Placeholder: in next step, build and return a signed BasicOCSPResponse
-		return new NextResponse(`Not Implemented (serial=${serialHex || 'unknown'})`, {
-			status: 501,
-			headers: { 'Content-Type': 'text/plain' }
+
+		if (!serialHex) {
+			return new NextResponse('Malformed OCSP request', { status: 400 });
+		}
+		// Lookup certificate
+		const cert = await db.certificate.findUnique({ where: { serialNumber: serialHex.toUpperCase() } });
+		let status: 'good' | 'revoked' | 'unknown' = 'unknown';
+		if (cert) {
+			if (cert.status === 'REVOKED') status = 'revoked';
+			else if (cert.status === 'EXPIRED' || new Date() > cert.validTo) status = 'unknown';
+			else status = 'good';
+		}
+		// Get issuer (active CA)
+		const ca = await db.cAConfig.findFirst({ where: { status: 'ACTIVE' } });
+		if (!ca || !ca.certificate) {
+			return new NextResponse('tryLater', { status: 503 });
+		}
+		const enc = JSON.parse(ca.privateKey);
+		const caPriv = require('@/lib/crypto').Encryption.decrypt(enc.encrypted, enc.iv, enc.tag);
+		const resp = buildBasicOCSPResponseRSA({
+			issuerCertPem: ca.certificate,
+			issuerPrivateKeyPem: caPriv,
+			serialHex: (cert?.serialNumber || serialHex).replace(/^0x/, ''),
+			status,
+		});
+		return new NextResponse(resp, {
+			status: 200,
+			headers: { 'Content-Type': 'application/ocsp-response' },
 		});
 	} catch (e) {
 		return new NextResponse('Malformed OCSP request', { status: 400 });
