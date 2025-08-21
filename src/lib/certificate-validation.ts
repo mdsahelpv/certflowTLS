@@ -3,6 +3,10 @@ import { X509Utils } from './crypto';
 import { AuditService } from './audit';
 import forge from 'node-forge';
 
+// Simple in-memory cache for validation results (in production, use Redis)
+const validationCache = new Map<string, { result: CertificateValidationResult; timestamp: number }>();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
 export interface CertificateValidationResult {
   isValid: boolean;
   issues: string[];
@@ -25,6 +29,7 @@ export interface CertificateValidationResult {
     issuer: string;
   };
   lastValidated: Date;
+  cached?: boolean;
 }
 
 export interface ValidationOptions {
@@ -32,6 +37,10 @@ export interface ValidationOptions {
   checkRevocation?: boolean;
   maxChainLength?: number;
   includeChainInfo?: boolean;
+  requireTrustedRoot?: boolean;
+  validateExtensions?: boolean;
+  checkKeyUsage?: boolean;
+  checkBasicConstraints?: boolean;
 }
 
 export class CertificateValidationService {
@@ -49,8 +58,44 @@ export class CertificateValidationService {
       checkRevocation: true,
       maxChainLength: 10,
       includeChainInfo: true,
+      requireTrustedRoot: true,
+      validateExtensions: true,
+      checkKeyUsage: true,
+      checkBasicConstraints: true,
       ...options
     };
+
+    // Generate cache key based on certificate content and options
+    const cacheKey = this.generateCacheKey(certificatePem, defaultOptions);
+    
+    // Check cache first
+    const cachedResult = this.getCachedResult(cacheKey);
+    if (cachedResult) {
+      // Update lastValidated timestamp
+      cachedResult.lastValidated = new Date();
+      cachedResult.cached = true;
+      
+      // Log cache hit
+      await AuditService.log({
+        action: 'CERTIFICATE_VALIDATED',
+        userId,
+        username,
+        description: `Certificate validation completed (cached) for ${cachedResult.chainInfo.endEntity}`,
+        metadata: {
+          isValid: cachedResult.isValid,
+          issuesCount: cachedResult.issues.length,
+          chainLength: cachedResult.chainInfo.chainLength,
+          expired: cachedResult.expiration.expired,
+          endEntity: cachedResult.chainInfo.endEntity,
+          issuer: cachedResult.signature.issuer,
+          trustedRoot: cachedResult.chainInfo.rootCA !== null,
+          validationOptions: defaultOptions,
+          cached: true
+        }
+      });
+      
+      return cachedResult;
+    }
 
     try {
       // Get all CA certificates from database
@@ -63,13 +108,14 @@ export class CertificateValidationService {
         .map(config => config.certificate)
         .filter(Boolean) as string[];
 
-      // Validate certificate chain
+      // Validate certificate chain with enhanced options
       const chainValidation = X509Utils.validateCertificateChain(
         certificatePem,
         caCertificates,
         {
           checkExpiration: defaultOptions.checkExpiration,
-          maxChainLength: defaultOptions.maxChainLength
+          maxChainLength: defaultOptions.maxChainLength,
+          requireTrustedRoot: defaultOptions.requireTrustedRoot
         }
       );
 
@@ -90,6 +136,15 @@ export class CertificateValidationService {
       // Verify signature
       const signature = await this.verifySignature(certificatePem, caCertificates);
 
+      // Additional validation checks
+      if (defaultOptions.validateExtensions || defaultOptions.checkKeyUsage || defaultOptions.checkBasicConstraints) {
+        const additionalValidation = await this.performAdditionalValidation(
+          certificatePem,
+          defaultOptions
+        );
+        chainValidation.issues.push(...additionalValidation.issues);
+      }
+
       const result: CertificateValidationResult = {
         isValid: chainValidation.isValid && !expiration.expired && signature.verified,
         issues: chainValidation.issues,
@@ -97,8 +152,12 @@ export class CertificateValidationService {
         chainInfo,
         expiration,
         signature,
-        lastValidated: new Date()
+        lastValidated: new Date(),
+        cached: false
       };
+
+      // Cache the result
+      this.cacheValidationResult(cacheKey, result);
 
       // Log validation attempt with proper action and user context
       await AuditService.log({
@@ -111,8 +170,10 @@ export class CertificateValidationService {
           issuesCount: result.issues.length,
           chainLength: result.chainInfo.chainLength,
           expired: result.expiration.expired,
-          endEntity: chainInfo.endEntity,
-          issuer: signature.issuer
+          endEntity: result.chainInfo.endEntity,
+          issuer: signature.issuer,
+          trustedRoot: result.chainInfo.rootCA !== null,
+          validationOptions: defaultOptions
         }
       });
 
@@ -154,7 +215,8 @@ export class CertificateValidationService {
           verified: false,
           issuer: 'Unknown'
         },
-        lastValidated: new Date()
+        lastValidated: new Date(),
+        cached: false
       };
     }
   }
@@ -225,6 +287,73 @@ export class CertificateValidationService {
     } catch (error) {
       return { verified: false, issuer: 'Unknown' };
     }
+  }
+
+  /**
+   * Perform additional validation checks on the certificate
+   */
+  private static async performAdditionalValidation(
+    certificatePem: string,
+    options: ValidationOptions
+  ): Promise<{ issues: string[] }> {
+    const issues: string[] = [];
+    
+    try {
+      const cert = forge.pki.certificateFromPem(certificatePem);
+      
+      // Validate extensions if requested
+      if (options.validateExtensions) {
+        const extensionValidation = X509Utils.validateExtensions(cert.extensions, false);
+        if (!extensionValidation.isCompliant) {
+          issues.push(...extensionValidation.issues);
+        }
+      }
+      
+      // Check key usage if requested
+      if (options.checkKeyUsage) {
+        const keyUsage: any = cert.getExtension('keyUsage');
+        if (keyUsage) {
+          // Check for appropriate key usage based on certificate type
+          const hasServerAuth = keyUsage.extKeyUsage?.includes('1.3.6.1.5.5.7.3.1');
+          const hasClientAuth = keyUsage.extKeyUsage?.includes('1.3.6.1.5.5.7.3.2');
+          const hasCodeSigning = keyUsage.extKeyUsage?.includes('1.3.6.1.5.5.7.3.3');
+          
+          if (!hasServerAuth && !hasClientAuth && !hasCodeSigning) {
+            issues.push('Certificate lacks appropriate extended key usage');
+          }
+        }
+      }
+      
+      // Check basic constraints if requested
+      if (options.checkBasicConstraints) {
+        const basicConstraints: any = cert.getExtension('basicConstraints');
+        if (basicConstraints?.cA && !basicConstraints.critical) {
+          issues.push('Basic Constraints extension should be critical for CA certificates');
+        }
+      }
+      
+      // Check for weak algorithms
+      const publicKey = cert.publicKey;
+      if (publicKey) {
+        if (publicKey.n && publicKey.n.bitLength() < 2048) {
+          issues.push('RSA key size is less than 2048 bits (weak)');
+        }
+        if (publicKey.curve && ['secp160k1', 'secp160r1', 'secp160r2'].includes(publicKey.curve)) {
+          issues.push('ECDSA curve is weak (less than 256 bits)');
+        }
+      }
+      
+      // Check for deprecated hash algorithms in signature
+      const signatureAlgorithm = cert.signatureAlgorithm;
+      if (signatureAlgorithm && signatureAlgorithm.includes('md5')) {
+        issues.push('Certificate uses deprecated MD5 hash algorithm');
+      }
+      
+    } catch (error) {
+      issues.push('Failed to perform additional validation checks');
+    }
+    
+    return { issues };
   }
 
   /**
@@ -374,6 +503,58 @@ export class CertificateValidationService {
       revokedCertificates,
       certificatesNeedingValidation,
       averageChainLength
+    };
+  }
+
+  /**
+   * Generate a cache key for a certificate validation result.
+   */
+  private static generateCacheKey(certificatePem: string, options: ValidationOptions): string {
+    return `${certificatePem}-${JSON.stringify(options)}`;
+  }
+
+  /**
+   * Get a cached validation result.
+   */
+  private static getCachedResult(cacheKey: string): CertificateValidationResult | null {
+    const cached = validationCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+      return cached.result;
+    }
+    return null;
+  }
+
+  /**
+   * Cache a validation result.
+   */
+  private static cacheValidationResult(cacheKey: string, result: CertificateValidationResult): void {
+    validationCache.set(cacheKey, { result, timestamp: Date.now() });
+  }
+
+  /**
+   * Clear the validation cache.
+   */
+  static async clearValidationCache(): Promise<{ cleared: number }> {
+    const size = validationCache.size;
+    validationCache.clear();
+    return { cleared: size };
+  }
+
+  /**
+   * Get cache statistics.
+   */
+  static async getCacheStatistics(): Promise<{
+    size: number;
+    hitRate: number;
+    totalRequests: number;
+    cacheHits: number;
+  }> {
+    // This is a simplified implementation - in production, track actual hit rates
+    return {
+      size: validationCache.size,
+      hitRate: 0.75, // Placeholder - implement actual tracking
+      totalRequests: 0, // Placeholder - implement actual tracking
+      cacheHits: 0 // Placeholder - implement actual tracking
     };
   }
 }

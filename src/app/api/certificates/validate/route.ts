@@ -121,9 +121,27 @@ export async function GET(request: NextRequest) {
           return NextResponse.json({ error: 'Failed to retrieve pending certificates' }, { status: 500 });
         }
 
+      case 'cache-clear':
+        try {
+          const cleared = await CertificateValidationService.clearValidationCache();
+          return NextResponse.json({ success: true, message: 'Cache cleared', cleared });
+        } catch (error) {
+          console.error('Failed to clear cache:', error);
+          return NextResponse.json({ error: 'Failed to clear cache' }, { status: 500 });
+        }
+
+      case 'cache-stats':
+        try {
+          const stats = await CertificateValidationService.getCacheStatistics();
+          return NextResponse.json({ success: true, statistics: stats });
+        } catch (error) {
+          console.error('Failed to get cache statistics:', error);
+          return NextResponse.json({ error: 'Failed to retrieve cache statistics' }, { status: 500 });
+        }
+
       default:
         return NextResponse.json({ 
-          error: 'Invalid action. Valid actions: health, statistics, pending' 
+          error: 'Invalid action. Valid actions: health, statistics, pending, cache-clear, cache-stats' 
         }, { status: 400 });
     }
 
