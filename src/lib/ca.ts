@@ -52,6 +52,8 @@ export class CAService {
         keySize: config.keySize,
         curve: config.curve,
         status: CAStatus.INITIALIZING,
+        crlDistributionPoint: process.env.CRL_DISTRIBUTION_POINT || undefined,
+        ocspUrl: process.env.OCSP_URL || undefined,
       },
     });
 
@@ -83,6 +85,8 @@ export class CAService {
         status: CAStatus.ACTIVE,
         validFrom: notBefore,
         validTo: notAfter,
+        crlDistributionPoint: caConfig.crlDistributionPoint || process.env.CRL_DISTRIBUTION_POINT || undefined,
+        ocspUrl: caConfig.ocspUrl || process.env.OCSP_URL || undefined,
       },
     });
 
@@ -186,8 +190,8 @@ export class CAService {
         extKeyUsage: this.getExtendedKeyUsage(data.certificateType),
         
         // CRL and OCSP URLs
-        crlDistributionPointUrl: process.env.CRL_DISTRIBUTION_POINT || undefined,
-        ocspUrl: process.env.OCSP_URL || undefined,
+        crlDistributionPointUrl: caConfig.crlDistributionPoint || undefined,
+        ocspUrl: caConfig.ocspUrl || undefined,
         
         // CA-specific basic constraints only; advanced policy/name constraints omitted for compatibility
         ...(data.certificateType === 'CA' && {
