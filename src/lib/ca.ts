@@ -3,6 +3,7 @@ import { CAStatus, KeyAlgorithm, CertificateType, CertificateStatus } from '@pri
 import { Encryption, CertificateUtils, CSRUtils, CRLUtils, X509Utils } from './crypto';
 import { AuditService } from './audit';
 import forge from 'node-forge';
+import { publishCRLToEndpoints } from './notifications';
 
 export interface CAConfigData {
   name?: string;
@@ -51,6 +52,8 @@ export class CAService {
         keySize: config.keySize,
         curve: config.curve,
         status: CAStatus.INITIALIZING,
+        crlDistributionPoint: process.env.CRL_DISTRIBUTION_POINT || undefined,
+        ocspUrl: process.env.OCSP_URL || undefined,
       },
     });
 
@@ -82,6 +85,8 @@ export class CAService {
         status: CAStatus.ACTIVE,
         validFrom: notBefore,
         validTo: notAfter,
+        crlDistributionPoint: caConfig.crlDistributionPoint || process.env.CRL_DISTRIBUTION_POINT || undefined,
+        ocspUrl: caConfig.ocspUrl || process.env.OCSP_URL || undefined,
       },
     });
 
@@ -185,8 +190,8 @@ export class CAService {
         extKeyUsage: this.getExtendedKeyUsage(data.certificateType),
         
         // CRL and OCSP URLs
-        crlDistributionPointUrl: process.env.CRL_DISTRIBUTION_POINT || undefined,
-        ocspUrl: process.env.OCSP_URL || undefined,
+        crlDistributionPointUrl: caConfig.crlDistributionPoint || undefined,
+        ocspUrl: caConfig.ocspUrl || undefined,
         
         // CA-specific basic constraints only; advanced policy/name constraints omitted for compatibility
         ...(data.certificateType === 'CA' && {
@@ -365,6 +370,20 @@ export class CAService {
         ca: { connect: { id: caConfig.id } },
       },
     });
+
+    // Publish to HA endpoints if configured
+    const endpointsVar = process.env.CRL_PUBLICATION_ENDPOINTS || '';
+    const endpoints = endpointsVar
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (endpoints.length > 0) {
+      try {
+        await publishCRLToEndpoints(crl, endpoints);
+      } catch (e) {
+        console.error('CRL publication failed', e);
+      }
+    }
 
     // Log audit event
     await AuditService.log({
@@ -750,5 +769,17 @@ export class CAService {
       permittedSubtrees: ['example.com', '*.example.com'],
       excludedSubtrees: ['internal.example.com']
     };
+  }
+
+  static startCRLScheduler(): void {
+    const hours = parseInt(process.env.CRL_UPDATE_INTERVAL_HOURS || '24', 10);
+    const intervalMs = Math.max(1, hours) * 60 * 60 * 1000;
+    setInterval(async () => {
+      try {
+        await this.generateCRL();
+      } catch (err) {
+        console.error('CRL scheduler run failed:', err);
+      }
+    }, intervalMs);
   }
 }
