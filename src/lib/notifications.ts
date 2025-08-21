@@ -295,3 +295,18 @@ export class NotificationService {
     }
   }
 }
+
+export async function publishCRLToEndpoints(crlPem: string, endpoints: string[]): Promise<void> {
+	const tasks = endpoints.map(async (url) => {
+		try {
+			await fetch(url, {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/x-pkcs7-crl' },
+				body: crlPem,
+			});
+		} catch (err) {
+			console.error('Failed to publish CRL to', url, err);
+		}
+	});
+	await Promise.allSettled(tasks);
+}
