@@ -12,14 +12,23 @@ export function securityMiddleware(request: NextRequest) {
 
   // Validate origin for API routes
   if (request.nextUrl.pathname.startsWith('/api/')) {
-    if (!SecurityMiddleware.validateOrigin(request)) {
-      return new NextResponse(
-        JSON.stringify({ error: 'Invalid origin' }),
-        { 
-          status: 403,
-          headers: { 'Content-Type': 'application/json' }
-        }
-      );
+    // Allow public endpoints without origin
+    const publicPaths = [
+      '/api/health',
+      '/api/crl/download/latest',
+      '/api/ocsp',
+      '/api/ocsp/binary'
+    ];
+    if (!publicPaths.includes(request.nextUrl.pathname)) {
+      if (!SecurityMiddleware.validateOrigin(request)) {
+        return new NextResponse(
+          JSON.stringify({ error: 'Invalid origin' }),
+          { 
+            status: 403,
+            headers: { 'Content-Type': 'application/json' }
+          }
+        );
+      }
     }
 
     // Rate limiting for sensitive operations
