@@ -45,6 +45,7 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/next.config.ts ./next.config.ts
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/create-admin.js ./create-admin.js
+COPY --from=builder /app/tsconfig.json ./tsconfig.json
 
 # Set the correct permission for prerender cache
 RUN mkdir .next

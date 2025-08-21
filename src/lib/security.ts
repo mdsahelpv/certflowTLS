@@ -35,8 +35,11 @@ export class SecurityMiddleware {
     const origin = request.headers.get('origin');
     const host = request.headers.get('host');
     
-    // In production, compare against allowed origins
-    if (!origin || !host) return false;
+    // Require Host header
+    if (!host) return false;
+
+    // If no Origin header (e.g., curl, same-origin navigations), allow
+    if (!origin) return true;
     
     // Allow same origin
     if (origin.includes(host)) return true;
