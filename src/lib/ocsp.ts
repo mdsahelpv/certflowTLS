@@ -44,22 +44,12 @@ function algoIdentifierSha256WithRSA() {
 
 function getIssuerNameAndKeyHashes(issuerCertPem: string) {
 	const cert = forge.pki.certificateFromPem(issuerCertPem);
-	const certAsn1 = forge.pki.certificateToAsn1(cert);
-	const tbs = certAsn1.value[0];
-	// issuer at index 3; subjectPublicKeyInfo at index 6 (for v3)
-	const issuerAsn1 = tbs.value[3];
-	const spki = tbs.value[6];
-	const spkBitString = spki.value[1];
-	const bitStringBytes = spkBitString.value || '';
-	// Drop the first unused-bits count byte
-	const pubKeyBytes = bitStringBytes.length > 0 ? bitStringBytes.substring(1) : '';
-	const issuerDer = forge.asn1.toDer(issuerAsn1).getBytes();
+	const issuerDer = forge.asn1.toDer(forge.pki.distinguishedNameToAsn1(cert.issuer)).getBytes();
 	const md1 = forge.md.sha1.create();
 	md1.update(issuerDer);
 	const issuerNameHash = md1.digest().getBytes();
-	const md2 = forge.md.sha1.create();
-	md2.update(pubKeyBytes);
-	const issuerKeyHash = md2.digest().getBytes();
+	const fp = forge.pki.getPublicKeyFingerprint(cert.publicKey, { md: forge.md.sha1.create(), type: 'SubjectPublicKey' as any });
+	const issuerKeyHash = fp.getBytes ? fp.getBytes() : fp as unknown as string;
 	return { issuerNameHash, issuerKeyHash };
 }
 
