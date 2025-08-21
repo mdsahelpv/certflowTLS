@@ -40,7 +40,9 @@ export class CertificateValidationService {
    */
   static async validateCertificate(
     certificatePem: string,
-    options: ValidationOptions = {}
+    options: ValidationOptions = {},
+    userId?: string,
+    username?: string
   ): Promise<CertificateValidationResult> {
     const defaultOptions: ValidationOptions = {
       checkExpiration: true,
@@ -98,15 +100,19 @@ export class CertificateValidationService {
         lastValidated: new Date()
       };
 
-      // Log validation attempt
+      // Log validation attempt with proper action and user context
       await AuditService.log({
-        action: 'CERTIFICATE_ISSUED' as any, // Temporary fix until schema is regenerated
+        action: 'CERTIFICATE_VALIDATED',
+        userId,
+        username,
         description: `Certificate validation completed for ${chainInfo.endEntity}`,
         metadata: {
           isValid: result.isValid,
           issuesCount: result.issues.length,
           chainLength: result.chainInfo.chainLength,
-          expired: result.expiration.expired
+          expired: result.expiration.expired,
+          endEntity: chainInfo.endEntity,
+          issuer: signature.issuer
         }
       });
 
@@ -115,11 +121,16 @@ export class CertificateValidationService {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       
-      // Log validation error
+      // Log validation error with proper action and user context
       await AuditService.log({
-        action: 'CERTIFICATE_ISSUED' as any, // Temporary fix until schema is regenerated
+        action: 'CERTIFICATE_VALIDATION_ERROR',
+        userId,
+        username,
         description: `Certificate validation failed: ${errorMessage}`,
-        metadata: { error: errorMessage }
+        metadata: { 
+          error: errorMessage,
+          certificatePemLength: certificatePem.length // Log length, not content
+        }
       });
 
       return {
@@ -213,6 +224,57 @@ export class CertificateValidationService {
 
     } catch (error) {
       return { verified: false, issuer: 'Unknown' };
+    }
+  }
+
+  /**
+   * Update lastValidated timestamp for a certificate
+   */
+  static async updateLastValidated(certificateId: string): Promise<void> {
+    try {
+      await db.certificate.update({
+        where: { id: certificateId },
+        data: { lastValidated: new Date() }
+      });
+    } catch (error) {
+      // Log error but don't fail validation
+      console.error('Failed to update lastValidated:', error);
+    }
+  }
+
+  /**
+   * Validate a certificate by ID from database
+   */
+  static async validateCertificateById(
+    certificateId: string,
+    options: ValidationOptions = {},
+    userId?: string,
+    username?: string
+  ): Promise<CertificateValidationResult | null> {
+    try {
+      const certificate = await db.certificate.findUnique({
+        where: { id: certificateId },
+        select: { certificate: true, serialNumber: true }
+      });
+
+      if (!certificate?.certificate) {
+        return null;
+      }
+
+      const result = await this.validateCertificate(
+        certificate.certificate,
+        options,
+        userId,
+        username
+      );
+
+      // Update lastValidated timestamp
+      await this.updateLastValidated(certificateId);
+
+      return result;
+    } catch (error) {
+      console.error('Error validating certificate by ID:', error);
+      return null;
     }
   }
 
