@@ -513,10 +513,10 @@ export class X509Utils {
       if (options.checkExpiration !== false) {
         const now = new Date();
         if (now < cert.validity.notBefore) {
-          issues.push(`Certificate is not yet valid. Valid from: ${cert.validity.notBefore}`);
+          issues.push(`Certificate is not yet valid. Valid from: ${cert.validity.notBefore.toISOString().split('T')[0]}`);
         }
         if (now > cert.validity.notAfter) {
-          issues.push(`Certificate has expired. Expired on: ${cert.validity.notAfter}`);
+          issues.push(`Certificate has expired. Expired on: ${cert.validity.notAfter.toISOString().split('T')[0]}`);
         }
       }
       
@@ -541,10 +541,12 @@ export class X509Utils {
           // Verify signature with issuer's public key, never throw
           try {
             if (!currentCert.verify(issuerCert.publicKey)) {
-              issues.push(`Certificate signature verification failed with issuer: ${issuerCert.subject.getField('CN')?.value || 'Unknown'}`);
+              const issuerCN = issuerCert.subject.getField('CN')?.value || 'Unknown';
+              issues.push(`Certificate signature verification failed with issuer: ${issuerCN}`);
             }
           } catch (e) {
-            issues.push(`Certificate signature verification error with issuer: ${issuerCert.subject.getField('CN')?.value || 'Unknown'}`);
+            const issuerCN = issuerCert.subject.getField('CN')?.value || 'Unknown';
+            issues.push(`Certificate signature verification error with issuer: ${issuerCN}`);
           }
 
           // Check if issuer is a CA (defensive: extension shapes vary)
@@ -552,18 +554,24 @@ export class X509Utils {
             const basicConstraints: any = issuerCert.getExtension('basicConstraints');
             const isCA = basicConstraints?.cA ?? basicConstraints?.value?.cA ?? false;
             if (!isCA) {
-              issues.push(`Issuer certificate is not a CA: ${issuerCert.subject.getField('CN')?.value || 'Unknown'}`);
+              const issuerCN = issuerCert.subject.getField('CN')?.value || 'Unknown';
+              issues.push(`Issuer certificate is not a CA: ${issuerCN}`);
             }
-          } catch {}
+          } catch {
+            // Extension parsing failed, skip this check
+          }
           
           // Check issuer's key usage
           try {
             const keyUsage: any = issuerCert.getExtension('keyUsage');
             const canSign = keyUsage?.keyCertSign ?? keyUsage?.value?.keyCertSign ?? false;
             if (!canSign) {
-              issues.push(`Issuer certificate cannot sign other certificates: ${issuerCert.subject.getField('CN')?.value || 'Unknown'}`);
+              const issuerCN = issuerCert.subject.getField('CN')?.value || 'Unknown';
+              issues.push(`Issuer certificate cannot sign other certificates: ${issuerCN}`);
             }
-          } catch {}
+          } catch {
+            // Extension parsing failed, skip this check
+          }
           
           chain.push({ cert: issuerCert, status: 'valid' });
           currentCert = issuerCert;
@@ -577,7 +585,7 @@ export class X509Utils {
       }
       
     } catch (error) {
-      // Avoid leaking internal forge errors
+      // Avoid leaking internal forge errors - provide generic message
       issues.push('Failed to parse or validate the certificate. Please ensure it is a single valid PEM certificate.');
     }
     

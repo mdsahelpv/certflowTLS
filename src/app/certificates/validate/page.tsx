@@ -47,6 +47,7 @@ export default function CertificateValidationPage() {
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
   const [isValidating, setIsValidating] = useState(false);
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
 
   if (isLoading) {
     return (
@@ -65,14 +66,23 @@ export default function CertificateValidationPage() {
       setError('Please enter a certificate PEM');
       return;
     }
-    // Basic PEM guard
-    if (!/-----BEGIN CERTIFICATE-----[\s\S]+-----END CERTIFICATE-----/.test(certificatePem.trim())) {
+    
+    // Enhanced PEM validation
+    const trimmedPem = certificatePem.trim();
+    if (!/^-----BEGIN CERTIFICATE-----[\s\S]+-----END CERTIFICATE-----$/.test(trimmedPem)) {
       setError('Input does not look like a valid PEM certificate. Please paste a correct certificate.');
+      return;
+    }
+
+    // Size validation
+    if (trimmedPem.length > 50000) {
+      setError('Certificate too large. Maximum size is 50KB.');
       return;
     }
 
     setIsValidating(true);
     setError('');
+    setSuccessMessage('');
     setValidationResult(null);
 
     try {
@@ -80,19 +90,30 @@ export default function CertificateValidationPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          certificatePem: certificatePem.trim(),
+          certificatePem: trimmedPem,
           options: { checkExpiration: true, checkRevocation: true, maxChainLength: 10 },
         }),
       });
 
       const data = await response.json();
+      
       if (response.ok) {
         setValidationResult(data.result);
+        setSuccessMessage(`Certificate validation completed successfully at ${new Date().toLocaleString()}`);
       } else {
-        setError(data.error || 'Validation failed');
+        // Handle specific error cases
+        if (response.status === 429) {
+          setError('Rate limit exceeded. Please wait a moment before trying again.');
+        } else if (response.status === 400) {
+          setError(data.error || 'Invalid certificate format');
+        } else if (response.status === 401) {
+          setError('Authentication required. Please sign in again.');
+        } else {
+          setError(data.error || 'Validation failed');
+        }
       }
     } catch (e) {
-      setError('An error occurred during validation');
+      setError('Network error. Please check your connection and try again.');
     } finally {
       setIsValidating(false);
     }
@@ -132,22 +153,43 @@ export default function CertificateValidationPage() {
             </div>
             {error && (
               <Alert variant="destructive">
-                <AlertDescription>{error}</AlertDescription>
+                <XCircle className="h-4 w-4" />
+                <AlertDescription className="font-medium">{error}</AlertDescription>
               </Alert>
             )}
-            <Button onClick={handleValidation} disabled={isValidating || !certificatePem.trim()} className="w-full">
-              {isValidating ? (
-                <>
-                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                  Validating...
-                </>
-              ) : (
-                <>
-                  <Shield className="mr-2 h-4 w-4" />
-                  Validate Certificate
-                </>
-              )}
-            </Button>
+            {successMessage && (
+              <Alert variant="success">
+                <CheckCircle className="h-4 w-4" />
+                <AlertDescription className="font-medium">{successMessage}</AlertDescription>
+              </Alert>
+            )}
+            <div className="flex gap-2">
+              <Button onClick={handleValidation} disabled={isValidating || !certificatePem.trim()} className="flex-1">
+                {isValidating ? (
+                  <>
+                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                    Validating...
+                  </>
+                ) : (
+                  <>
+                    <Shield className="mr-2 h-4 w-4" />
+                    Validate Certificate
+                  </>
+                )}
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setCertificatePem('');
+                  setValidationResult(null);
+                  setError('');
+                  setSuccessMessage('');
+                }}
+                disabled={isValidating}
+              >
+                Clear
+              </Button>
+            </div>
           </CardContent>
         </Card>
 
