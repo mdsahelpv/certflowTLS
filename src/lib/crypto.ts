@@ -499,6 +499,7 @@ export class X509Utils {
       checkExpiration?: boolean;
       checkRevocation?: boolean;
       maxChainLength?: number;
+      requireTrustedRoot?: boolean;
     } = {}
   ): { isValid: boolean; issues: string[]; chain: Array<{ cert: forge.pki.Certificate; status: string }> } {
     const issues: string[] = [];
@@ -520,12 +521,17 @@ export class X509Utils {
         }
       }
       
-      // Skip self-signature verification; issuer verification is handled below
+      // Validate certificate extensions for compliance
+      const extensionValidation = this.validateExtensions(cert.extensions, false);
+      if (!extensionValidation.isCompliant) {
+        issues.push(...extensionValidation.issues);
+      }
       
       // Build and validate certificate chain
       const maxChainLength = options.maxChainLength || 10;
       let currentCert = cert;
       let chainLength = 0;
+      let foundTrustedRoot = false;
       
       while (chainLength < maxChainLength) {
         // Find issuer certificate
@@ -534,11 +540,19 @@ export class X509Utils {
           if (chainLength === 0) {
             issues.push('No issuer certificate found for the certificate');
           } else {
-            // This is the root CA
+            // This is the root CA - check if it's trusted
+            const rootStatus = this.validateRootCA(currentCert, caCertificates);
+            if (rootStatus.isTrusted) {
+              foundTrustedRoot = true;
+              chain.push({ cert: currentCert, status: 'trusted_root' });
+            } else {
+              issues.push(`Root CA not trusted: ${rootStatus.reason}`);
+              chain.push({ cert: currentCert, status: 'untrusted_root' });
+            }
             break;
           }
         } else {
-          // Verify signature with issuer's public key, never throw
+          // Verify signature with issuer's public key
           try {
             if (!currentCert.verify(issuerCert.publicKey)) {
               const issuerCN = issuerCert.subject.getField('CN')?.value || 'Unknown';
@@ -549,28 +563,10 @@ export class X509Utils {
             issues.push(`Certificate signature verification error with issuer: ${issuerCN}`);
           }
 
-          // Check if issuer is a CA (defensive: extension shapes vary)
-          try {
-            const basicConstraints: any = issuerCert.getExtension('basicConstraints');
-            const isCA = basicConstraints?.cA ?? basicConstraints?.value?.cA ?? false;
-            if (!isCA) {
-              const issuerCN = issuerCert.subject.getField('CN')?.value || 'Unknown';
-              issues.push(`Issuer certificate is not a CA: ${issuerCN}`);
-            }
-          } catch {
-            // Extension parsing failed, skip this check
-          }
-          
-          // Check issuer's key usage
-          try {
-            const keyUsage: any = issuerCert.getExtension('keyUsage');
-            const canSign = keyUsage?.keyCertSign ?? keyUsage?.value?.keyCertSign ?? false;
-            if (!canSign) {
-              const issuerCN = issuerCert.subject.getField('CN')?.value || 'Unknown';
-              issues.push(`Issuer certificate cannot sign other certificates: ${issuerCN}`);
-            }
-          } catch {
-            // Extension parsing failed, skip this check
+          // Validate issuer certificate
+          const issuerValidation = this.validateIssuerCertificate(issuerCert, chainLength);
+          if (issuerValidation.issues.length > 0) {
+            issues.push(...issuerValidation.issues);
           }
           
           chain.push({ cert: issuerCert, status: 'valid' });
@@ -584,6 +580,11 @@ export class X509Utils {
         issues.push(`Certificate chain too long (max: ${maxChainLength})`);
       }
       
+      // Check if we require a trusted root and found one
+      if (options.requireTrustedRoot && !foundTrustedRoot) {
+        issues.push('Certificate chain does not lead to a trusted root CA');
+      }
+      
     } catch (error) {
       // Avoid leaking internal forge errors - provide generic message
       issues.push('Failed to parse or validate the certificate. Please ensure it is a single valid PEM certificate.');
@@ -594,6 +595,114 @@ export class X509Utils {
       issues,
       chain
     };
+  }
+
+  // Validate root CA trust
+  private static validateRootCA(
+    rootCert: forge.pki.Certificate,
+    caCertificates: string[]
+  ): { isTrusted: boolean; reason?: string } {
+    try {
+      // Check if this root CA is in our trusted store
+      const rootFingerprint = this.generateCertificateFingerprint(rootCert);
+      
+      for (const caCertPem of caCertificates) {
+        try {
+          const caCert = forge.pki.certificateFromPem(caCertPem);
+          const caFingerprint = this.generateCertificateFingerprint(caCert);
+          
+          if (rootFingerprint === caFingerprint) {
+            return { isTrusted: true };
+          }
+        } catch {
+          continue;
+        }
+      }
+      
+      // Check if it's a self-signed root with proper CA constraints
+      if (this.isSelfSigned(rootCert)) {
+        const basicConstraints = rootCert.getExtension('basicConstraints');
+        const keyUsage = rootCert.getExtension('keyUsage');
+        
+        if (basicConstraints?.cA && keyUsage?.keyCertSign) {
+          return { isTrusted: true };
+        } else {
+          return { isTrusted: false, reason: 'Self-signed root lacks proper CA constraints' };
+        }
+      }
+      
+      return { isTrusted: false, reason: 'Root CA not in trusted store and not properly self-signed' };
+    } catch {
+      return { isTrusted: false, reason: 'Failed to validate root CA' };
+    }
+  }
+
+  // Validate issuer certificate
+  private static validateIssuerCertificate(
+    issuerCert: forge.pki.Certificate,
+    chainLevel: number
+  ): { issues: string[] } {
+    const issues: string[] = [];
+    
+    try {
+      // Check if issuer is a CA
+      const basicConstraints: any = issuerCert.getExtension('basicConstraints');
+      const isCA = basicConstraints?.cA ?? basicConstraints?.value?.cA ?? false;
+      
+      if (!isCA) {
+        const issuerCN = issuerCert.subject.getField('CN')?.value || 'Unknown';
+        issues.push(`Issuer certificate is not a CA: ${issuerCN}`);
+      }
+      
+      // Check key usage
+      const keyUsage: any = issuerCert.getExtension('keyUsage');
+      const canSign = keyUsage?.keyCertSign ?? keyUsage?.value?.keyCertSign ?? false;
+      
+      if (!canSign) {
+        const issuerCN = issuerCert.subject.getField('CN')?.value || 'Unknown';
+        issues.push(`Issuer certificate cannot sign other certificates: ${issuerCN}`);
+      }
+      
+      // Check path length constraint for intermediate CAs
+      if (chainLevel > 0 && basicConstraints?.pathLenConstraint !== undefined) {
+        if (basicConstraints.pathLenConstraint < 0) {
+          const issuerCN = issuerCert.subject.getField('CN')?.value || 'Unknown';
+          issues.push(`Issuer certificate has invalid path length constraint: ${issuerCN}`);
+        }
+      }
+      
+      // Validate extensions for compliance
+      const extensionValidation = this.validateExtensions(issuerCert.extensions, true);
+      if (!extensionValidation.isCompliant) {
+        issues.push(...extensionValidation.issues.map(issue => `Issuer ${issue}`));
+      }
+      
+    } catch {
+      // Extension parsing failed, skip detailed validation
+    }
+    
+    return { issues };
+  }
+
+  // Check if certificate is self-signed
+  private static isSelfSigned(cert: forge.pki.Certificate): boolean {
+    try {
+      return cert.verify(cert.publicKey);
+    } catch {
+      return false;
+    }
+  }
+
+  // Generate certificate fingerprint
+  private static generateCertificateFingerprint(cert: forge.pki.Certificate): string {
+    try {
+      const der = forge.asn1.toDer(forge.pki.certificateToAsn1(cert));
+      const hash = forge.md.sha256.create();
+      hash.update(der.getBytes());
+      return hash.digest().toHex();
+    } catch {
+      return '';
+    }
   }
 
   // Find issuer certificate from a list of CA certificates
