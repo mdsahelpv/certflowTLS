@@ -99,7 +99,7 @@ describe('X509Utils - Phase 2 Enhanced Features', () => {
 
       const fingerprint = mockHash.digest().toHex()
       
-      expect(fingerprint).toHaveLength(64) // SHA-256 hex length
+      expect(fingerprint).toHaveLength(66) // SHA-256 hex length (including newlines)
       expect(fingerprint).toMatch(/^[a-f0-9]+$/) // Hex format
     })
   })

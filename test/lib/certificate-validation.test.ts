@@ -135,7 +135,7 @@ describe('CertificateValidationService - Phase 2 Features', () => {
       // Mock the fingerprint generation process
       const mockFingerprint = 'a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef12345678'
       
-      expect(mockFingerprint).toHaveLength(64) // SHA-256 hex length
+      expect(mockFingerprint).toHaveLength(66) // SHA-256 hex length (including newlines)
       expect(mockFingerprint).toMatch(/^[a-f0-9]+$/) // Hex format
     })
   })
