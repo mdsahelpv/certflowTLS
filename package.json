@@ -104,7 +104,8 @@
     "vaul": "^1.1.2",
     "z-ai-web-dev-sdk": "^0.0.10",
     "zod": "^4.0.2",
-    "zustand": "^5.0.6"
+    "zustand": "^5.0.6",
+    "tsconfig-paths": "^4.2.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
