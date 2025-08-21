@@ -56,6 +56,7 @@ model CAConfig {
   subjectDN           String    // Distinguished Name for the CA
   privateKey          String    // Encrypted private key
   certificate         String?   // Signed CA certificate (PEM format)
+  certificateChain    String?   // PEM bundle of intermediates up to (optionally) root
   csr                 String?   // Generated CSR
   keyAlgorithm        String    @default("RSA") // RSA, ECDSA, Ed25519
   keySize             Int?      // For RSA: 2048, 3072, 4096
