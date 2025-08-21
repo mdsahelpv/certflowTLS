@@ -27,6 +27,9 @@ services:
           sleep 2
         done &&
         echo '✅ PostgreSQL is ready!' &&
+        echo '🔧 Using PostgreSQL schema...' &&
+        # Ensure Prisma uses PostgreSQL schema (container-only)
+        cp prisma/schema.prisma.psql prisma/schema.prisma &&
         echo '🔧 Generating Prisma client...' &&
         npx prisma generate &&
         echo '📊 Pushing database schema...' &&
