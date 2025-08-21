@@ -3,6 +3,7 @@ import { CAStatus, KeyAlgorithm, CertificateType, CertificateStatus } from '@pri
 import { Encryption, CertificateUtils, CSRUtils, CRLUtils, X509Utils } from './crypto';
 import { AuditService } from './audit';
 import forge from 'node-forge';
+import { publishCRLToEndpoints } from './notifications';
 
 export interface CAConfigData {
   name?: string;
@@ -365,6 +366,20 @@ export class CAService {
         ca: { connect: { id: caConfig.id } },
       },
     });
+
+    // Publish to HA endpoints if configured
+    const endpointsVar = process.env.CRL_PUBLICATION_ENDPOINTS || '';
+    const endpoints = endpointsVar
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (endpoints.length > 0) {
+      try {
+        await publishCRLToEndpoints(crl, endpoints);
+      } catch (e) {
+        console.error('CRL publication failed', e);
+      }
+    }
 
     // Log audit event
     await AuditService.log({
