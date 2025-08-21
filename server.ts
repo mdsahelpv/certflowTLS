@@ -3,6 +3,8 @@ import { setupSocket } from './src/lib/socket';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import next from 'next';
+import { SystemInitializer } from './src/lib/init';
+import { CAService } from './src/lib/ca';
 
 const dev = process.env.NODE_ENV !== 'production';
 const currentPort = parseInt(process.env.PORT || '4000');
@@ -21,6 +23,10 @@ async function createCustomServer() {
 
     await nextApp.prepare();
     const handle = nextApp.getRequestHandler();
+
+    // Start background schedulers
+    await SystemInitializer.initialize();
+    CAService.startCRLScheduler();
 
     // Create HTTP server that will handle both Next.js and Socket.IO
     const server = createServer((req, res) => {

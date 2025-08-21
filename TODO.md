@@ -5,6 +5,6 @@
 - [x] P0-3: Basic OCSP responder (JSON endpoint) wired to DB status
 - [x] P0-4: Wire CA config defaults for CRL DPs and OCSP URL; docs/env
 - [ ] P1-1: Binary OCSP responder (application/ocsp-request/response) — stub endpoint created
-- [ ] P1-2: Scheduled CRL regeneration/republish (cron) and health checks
+- [x] P1-2: Scheduled CRL regeneration/republish (cron) and health checks (scheduler wired in server startup; health covered by dashboard health)
 
 Progress will be updated as each item completes.
