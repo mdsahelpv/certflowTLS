@@ -34,8 +34,8 @@ services:
         echo '📊 Pushing database schema...' &&
         npx prisma db push &&
         echo '✅ Database initialized! Starting application...' &&
-        echo '🚀 Starting server on port $PORT' &&
-        npx tsx server.ts
+        echo '🚀 Starting Next.js server on port $PORT' &&
+        npm start
       "
     environment:
       - PORT=3000
