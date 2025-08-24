@@ -7,6 +7,15 @@ process.env.NEXTAUTH_SECRET = 'test-secret-key'
 process.env.ENCRYPTION_KEY = 'test-32-character-encryption-key'
 process.env.DATABASE_URL = 'file:./test.db'
 
+// Enhanced error handling for tests
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason)
+})
+
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error)
+})
+
 // Mock Next.js router
 jest.mock('next/navigation', () => ({
   useRouter() {
@@ -102,8 +111,15 @@ jest.mock('@/lib/db', () => ({
 global.TextEncoder = TextEncoder
 global.TextDecoder = TextDecoder as any
 
-// Mock fetch
-global.fetch = jest.fn()
+// Mock fetch with better error handling
+global.fetch = jest.fn(() =>
+  Promise.resolve({
+    ok: true,
+    status: 200,
+    json: () => Promise.resolve({}),
+    text: () => Promise.resolve(''),
+  })
+) as jest.MockedFunction<typeof fetch>
 
 // Mock console methods in tests
 const originalConsoleError = console.error
@@ -123,3 +139,6 @@ afterAll(() => {
 afterEach(() => {
   jest.clearAllMocks()
 })
+
+// Global test timeout
+jest.setTimeout(10000)
