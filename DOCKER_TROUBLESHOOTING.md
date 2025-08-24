@@ -38,7 +38,7 @@ docker compose exec postgres psql -U postgres -d ca_management
 
 ### **Issue 1: Port Mismatch**
 **Problem**: Server running on port 4000, Docker expecting 3000
-**Solution**: ✅ **FIXED** - Updated server.ts and package.json to use port 3000
+**Solution**: ✅ **FIXED** - Updated server.ts and package.json to use port 3000 for both dev and production
 
 ### **Issue 2: Custom Server Not Starting**
 **Problem**: Custom server with Socket.IO failing in production
@@ -147,6 +147,15 @@ docker compose up --build
 docker compose logs -f ca-management
 ```
 
+### **For Local Development**
+```bash
+# Standard Next.js dev server (port 3000)
+npm run dev
+
+# Custom server with Socket.IO (port 3000)
+npm run dev:custom
+```
+
 ## 📊 **Expected Output**
 
 ### **Successful Startup Logs**
@@ -207,10 +216,10 @@ free -h
 
 ### **3. Use Development Mode**
 ```bash
-# Run in development mode locally
+# Run in development mode locally (port 3000)
 npm run dev
 
-# Then access at http://localhost:4000
+# Then access at http://localhost:3000
 ```
 
 ## 📞 **Support**
@@ -223,4 +232,4 @@ If you're still experiencing issues:
 
 ---
 
-**Remember**: The simple configuration (`docker-compose.simple.yml`) is more reliable for production use!
+**Remember**: Both development and production now use port 3000 by default for consistency!
