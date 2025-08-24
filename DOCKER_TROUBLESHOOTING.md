@@ -1,172 +1,207 @@
-# 🐳 Docker Troubleshooting Guide
+# Docker Troubleshooting Guide
 
-## 🚨 **Blank Page Issue - Solutions**
+## 🚨 **Current Issue: Blank Page & No Logs**
 
-### **Problem**: Docker Compose shows blank page at http://localhost:3000
+If you're experiencing a blank page when accessing `http://localhost:3000` and can't see any logs, follow this troubleshooting guide.
 
-### **Quick Fixes (Try in Order):**
+## 🔍 **Quick Diagnosis**
 
-#### **1. Check Container Status**
+### **Step 1: Check Container Status**
 ```bash
 # Check if containers are running
 docker compose ps
 
-# Check container logs
+# Expected output:
+# Name                    Command               State           Ports
+# ca-management          sh -c echo '⏳ Waiti ...   Up      0.0.0.0:3000->3000/tcp
+# postgres               docker-entrypoint.sh postgres    Up      0.0.0.0:5432->5432/tcp
+```
+
+### **Step 2: Check Application Logs**
+```bash
+# View application logs
 docker compose logs ca-management
+
+# View database logs
 docker compose logs postgres
+
+# Follow logs in real-time
+docker compose logs -f ca-management
 ```
 
-#### **2. Use Simple Configuration (Recommended)**
+### **Step 3: Check Health Endpoint**
 ```bash
-# Use the simplified Docker Compose file
-docker compose -f docker-compose.simple.yml up --build
-```
-
-#### **3. Check Health Endpoint**
-```bash
-# Test if the app is responding
+# Test if the application is responding
 curl http://localhost:3000/api/health
+
+# Expected response:
+# {"status":"healthy","checks":{"database":true,"auth":true,"notifications":true}}
 ```
 
-#### **4. Check Database Connection**
+## 🛠️ **Step-by-Step Solutions**
+
+### **Solution 1: Use Debug Configuration**
 ```bash
-# Connect to PostgreSQL container
-docker compose exec postgres psql -U postgres -d ca_management
+# Stop current containers
+docker compose down
+
+# Use debug configuration with verbose logging
+docker compose -f docker-compose.debug.yml up --build
+
+# This will show detailed startup information
 ```
 
-## 🔧 **Common Issues & Solutions**
-
-### **Issue 1: Port Mismatch**
-**Problem**: Server running on port 4000, Docker expecting 3000
-**Solution**: ✅ **FIXED** - Updated server.ts and package.json to use port 3000 for both dev and production
-
-### **Issue 2: Custom Server Not Starting**
-**Problem**: Custom server with Socket.IO failing in production
-**Solution**: 
+### **Solution 2: Check Logs Directory**
 ```bash
-# Use standard Next.js server instead
-docker compose -f docker-compose.simple.yml up --build
+# Create logs directory if it doesn't exist
+mkdir -p logs
+
+# Set proper permissions
+chmod 755 logs
+
+# Check if logs are being written
+tail -f logs/app.log
 ```
 
-### **Issue 3: Database Connection Issues**
-**Problem**: PostgreSQL not ready when app starts
-**Solution**: 
+### **Solution 3: Clean Rebuild**
 ```bash
-# Check database logs
-docker compose logs postgres
-
-# Restart with fresh database
+# Complete clean rebuild
 docker compose down -v
+docker system prune -f
+docker compose build --no-cache
 docker compose up --build
 ```
 
-### **Issue 4: Environment Variables**
-**Problem**: Missing or incorrect environment variables
-**Solution**: Check env.docker file and ensure all required variables are set
-
-## 🛠️ **Debugging Steps**
-
-### **Step 1: Check Container Logs**
+### **Solution 4: Use Simple Configuration**
 ```bash
-# View real-time logs
-docker compose logs -f ca-management
+# Try the simple configuration
+docker compose -f docker-compose.simple.yml up --build
+```
 
-# Check specific service
+## 🔧 **Common Issues and Fixes**
+
+### **Issue 1: "Connection refused" on port 3000**
+**Symptoms**: Cannot access `http://localhost:3000`
+**Solution**:
+```bash
+# Check if port 3000 is already in use
+lsof -ti:3000
+
+# Kill any process using port 3000
+lsof -ti:3000 | xargs kill -9
+
+# Restart Docker containers
+docker compose restart
+```
+
+### **Issue 2: "PostgreSQL is unavailable"**
+**Symptoms**: Application stuck waiting for database
+**Solution**:
+```bash
+# Check PostgreSQL logs
 docker compose logs postgres
+
+# Restart PostgreSQL container
+docker compose restart postgres
+
+# Wait for database to be ready
+docker compose logs -f postgres
 ```
 
-### **Step 2: Check Container Status**
+### **Issue 3: "Permission denied" on logs directory**
+**Symptoms**: Cannot write to logs directory
+**Solution**:
 ```bash
-# List all containers
-docker ps -a
+# Fix permissions
+sudo chown -R $USER:$USER logs/
+chmod 755 logs/
 
-# Check container health
-docker compose ps
+# Restart containers
+docker compose restart
 ```
 
-### **Step 3: Test Individual Services**
+### **Issue 4: "Build failed"**
+**Symptoms**: Docker build fails
+**Solution**:
 ```bash
-# Test PostgreSQL
-docker compose exec postgres pg_isready -U postgres
+# Clean Docker cache
+docker system prune -a
 
-# Test application health
-curl http://localhost:3000/api/health
+# Rebuild without cache
+docker compose build --no-cache
+
+# Start services
+docker compose up
 ```
 
-### **Step 4: Check Network Connectivity**
+### **Issue 5: "No logs visible"**
+**Symptoms**: No output in `docker compose logs`
+**Solution**:
 ```bash
-# Check if port is listening
-netstat -tulpn | grep 3000
+# Check if logs directory exists
+ls -la logs/
 
-# Test from inside container
-docker compose exec ca-management curl http://localhost:3000/api/health
+# Create logs directory
+mkdir -p logs
+
+# Use debug configuration
+docker compose -f docker-compose.debug.yml up --build
 ```
 
-## 📋 **Configuration Files**
-
-### **docker-compose.yml** (Custom Server)
-- Uses custom server with Socket.IO
-- More complex startup process
-- May have compatibility issues
-
-### **docker-compose.simple.yml** (Standard Server)
-- Uses standard Next.js server
-- Simpler and more reliable
-- Recommended for production
-
-## 🔍 **Troubleshooting Checklist**
-
-- [ ] Containers are running (`docker compose ps`)
-- [ ] No error logs (`docker compose logs`)
-- [ ] Health endpoint responds (`curl http://localhost:3000/api/health`)
-- [ ] Database is accessible (`docker compose exec postgres psql -U postgres`)
-- [ ] Port 3000 is listening (`netstat -tulpn | grep 3000`)
-- [ ] Environment variables are set correctly
-- [ ] Build completed successfully (`docker compose build`)
-
-## 🚀 **Recommended Deployment**
+## 🚀 **Recommended Deployment Steps**
 
 ### **For Production (Reliable)**
 ```bash
-# Use simple configuration
+# 1. Create logs directory
+mkdir -p logs
+
+# 2. Use simple configuration
 docker compose -f docker-compose.simple.yml up --build -d
 
-# Check status
+# 3. Check status
 docker compose -f docker-compose.simple.yml ps
 
-# View logs
+# 4. View logs
 docker compose -f docker-compose.simple.yml logs -f
 ```
 
-### **For Development (With Socket.IO)**
+### **For Debugging**
 ```bash
-# Use custom server configuration
-docker compose up --build
+# 1. Use debug configuration
+docker compose -f docker-compose.debug.yml up --build
 
-# Check logs for issues
-docker compose logs -f ca-management
+# 2. Watch logs in real-time
+docker compose -f docker-compose.debug.yml logs -f ca-management
 ```
 
-### **For Local Development**
+### **For Development**
 ```bash
-# Standard Next.js dev server (port 3000)
+# 1. Use local development
 npm run dev
 
-# Custom server with Socket.IO (port 3000)
-npm run dev:custom
+# 2. Access at http://localhost:3000
 ```
 
-## 📊 **Expected Output**
+## 📊 **Expected Log Output**
 
-### **Successful Startup Logs**
+### **Successful Startup**
 ```
-⏳ Waiting for PostgreSQL to be ready...
+🔍 DEBUG MODE: Starting application...
+📁 Current directory: /app
+📁 Directory contents: [files listed]
+🔧 Environment variables:
+  NODE_ENV: production
+  PORT: 3000
+  DATABASE_URL: postgresql://postgres:ca_management_password_2024@postgres:5432/ca_management
+  LOG_LEVEL: debug
+⏳ Waiting for PostgreSQL...
 ✅ PostgreSQL is ready!
-🔧 Using PostgreSQL schema...
-🔧 Generating Prisma client...
-📊 Pushing database schema...
-✅ Database initialized! Starting application...
-🚀 Starting server on port 3000
+🔧 Setting up database...
+✅ Database setup complete!
+🚀 Starting server...
+📝 Log level: debug
+📝 Log format: text
+📝 Log file: /app/logs/app.log
 🚀 Starting server in production mode
 📡 Server will listen on port 3000
 📦 Preparing Next.js app...
@@ -177,7 +212,7 @@ npm run dev:custom
 🗄️  Database URL: Configured
 ```
 
-### **Health Endpoint Response**
+### **Health Check Response**
 ```json
 {
   "status": "healthy",
@@ -186,50 +221,50 @@ npm run dev:custom
     "auth": true,
     "notifications": true
   },
-  "timestamp": "2025-08-24T04:00:00.000Z"
+  "timestamp": "2024-01-15T10:30:00.000Z"
 }
 ```
 
+## 🔍 **Troubleshooting Script**
+
+Use the automated troubleshooting script:
+```bash
+# Make script executable
+chmod +x docker-troubleshoot.sh
+
+# Run troubleshooting
+./docker-troubleshoot.sh
+```
+
+## 📋 **Checklist**
+
+Before reporting issues, verify:
+
+- [ ] Docker and Docker Compose are installed
+- [ ] Port 3000 is not in use by another service
+- [ ] `env.docker` file exists and has correct configuration
+- [ ] `logs` directory exists and has proper permissions
+- [ ] No firewall blocking port 3000
+- [ ] Sufficient disk space available
+- [ ] Docker daemon is running
+
 ## 🆘 **Still Having Issues?**
 
-### **1. Reset Everything**
-```bash
-# Stop and remove everything
-docker compose down -v
-docker system prune -f
+If the above solutions don't work:
 
-# Rebuild from scratch
-docker compose -f docker-compose.simple.yml up --build
-```
-
-### **2. Check System Resources**
-```bash
-# Check Docker resources
-docker system df
-
-# Check disk space
-df -h
-
-# Check memory usage
-free -h
-```
-
-### **3. Use Development Mode**
-```bash
-# Run in development mode locally (port 3000)
-npm run dev
-
-# Then access at http://localhost:3000
-```
+1. **Check Docker version**: `docker --version && docker compose version`
+2. **Check system resources**: `docker system df`
+3. **Check Docker daemon**: `docker info`
+4. **Try different port**: Change port mapping to `"3001:3000"`
+5. **Use host networking**: Add `network_mode: "host"` to service
 
 ## 📞 **Support**
 
-If you're still experiencing issues:
-1. Check the logs: `docker compose logs ca-management`
-2. Verify environment: `docker compose exec ca-management env`
-3. Test database: `docker compose exec postgres psql -U postgres -d ca_management`
-4. Check network: `docker network ls`
+- Check logs: `docker compose logs -f`
+- Check container status: `docker compose ps`
+- Check health endpoint: `curl http://localhost:3000/api/health`
+- View log files: `tail -f logs/app.log`
 
 ---
 
-**Remember**: Both development and production now use port 3000 by default for consistency!
+**Remember**: The debug configuration (`docker-compose.debug.yml`) provides the most verbose output for troubleshooting!
