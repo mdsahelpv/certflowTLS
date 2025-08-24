@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { UserRole, UserStatus } from '@prisma/client';
 import { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
+import { logger } from '@/lib/logger';
 
 export interface UserWithPermissions {
   id: string;
@@ -133,7 +134,7 @@ export class AuthService {
     const adminPassword = process.env.ADMIN_PASSWORD;
 
     if (!adminUsername || !adminPassword) {
-      console.warn('ADMIN_USERNAME or ADMIN_PASSWORD not set; skipping default admin creation');
+      logger.auth.warn('ADMIN_USERNAME or ADMIN_PASSWORD not set; skipping default admin creation');
       return;
     }
 
