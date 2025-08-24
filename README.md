@@ -21,171 +21,259 @@ An enterprise-grade subordinate CA manager to issue, renew, revoke, and export c
 - **Auth**: NextAuth.js (credentials), sessions + JWT
 - **Tooling**: Jest, ESLint, TypeScript, Nodemon/tsx
 
-## Getting Started
+## 🚀 Quick Start
 
-### Development (SQLite, port 4000)
+### **Development Environment** (SQLite + Next.js Dev Server)
 ```bash
-npm run setup:sqlite
+# 1. Install dependencies
 npm install
-npm run db:push:sqlite
-npm run dev
-# App: http://localhost:4000
-```
 
-### Production (Docker + PostgreSQL, port 3000)
-```bash
-cp env.docker .env
-docker-compose up --build
+# 2. Setup environment (SQLite)
+cp env.sqlite .env
+
+# 3. Initialize database
+npm run db:push:sqlite
+
+# 4. Start development server
+npm run dev
+
+# 5. Access application
 # App: http://localhost:3000
 ```
 
-### Prerequisites
-- Node.js 18+
-- npm 8+
-- Git
-- Docker & Docker Compose (for production)
-
-### Environment Configuration
-- Edit `.env` (see `env.example`, `env.sqlite`, `env.postgresql`, `env.docker`).
-- **Security-critical**:
-  - `NEXTAUTH_SECRET`: strong random secret
-  - `ENCRYPTION_KEY`: 32 chars (AES-256)
-- **Database**:
-  - Dev: `DATABASE_URL="file:./db/custom.db"`
-  - Prod: PostgreSQL URL (from Docker env)
-- **CA fields**: `CA_COUNTRY`, `CA_STATE`, `CA_LOCALITY`, `CA_ORGANIZATION`, `CA_ORGANIZATIONAL_UNIT`, `CA_COMMON_NAME`, `CA_EMAIL`
-- **Security**: `BCRYPT_ROUNDS`, `SESSION_MAX_AGE`, `RATE_LIMIT_WINDOW_MS`, `RATE_LIMIT_MAX_REQUESTS`
-- **X.509/Revocation**: `CA_PATH_LENGTH_CONSTRAINT`, `POLICY_REQUIRE_EXPLICIT`, `POLICY_INHIBIT_MAPPING`, `CRL_DISTRIBUTION_POINT`, `OCSP_URL`
-
-### Database Modes and Switching
-- Default dev mode uses SQLite; production uses PostgreSQL (Docker).
+### **Production Environment** (Docker + PostgreSQL)
 ```bash
-# SQLite -> PostgreSQL
-cp env.postgresql .env
-docker-compose up --build
+# 1. Setup environment (PostgreSQL)
+cp env.docker .env
 
-# PostgreSQL -> SQLite
-docker-compose down
+# 2. Start with Docker Compose
+docker compose up --build
+
+# 3. Access application
+# App: http://localhost:3000
+```
+
+## 📋 Environment Configuration
+
+### **Prerequisites**
+- **Development**: Node.js 18+, npm 8+, Git
+- **Production**: Docker & Docker Compose
+
+### **Environment Files**
+- `env.sqlite` - Development environment (SQLite database)
+- `env.docker` - Production environment (PostgreSQL via Docker)
+- `env.example` - Template with all available options
+
+### **Required Environment Variables**
+```bash
+# Security (CRITICAL - Change these!)
+NEXTAUTH_SECRET=your-strong-random-secret-here
+ENCRYPTION_KEY=your-32-character-encryption-key
+
+# Database
+DATABASE_URL=file:./db/custom.db          # Development (SQLite)
+DATABASE_URL=postgresql://...             # Production (PostgreSQL)
+
+# CA Configuration
+CA_COUNTRY=US
+CA_STATE=California
+CA_LOCALITY=San Francisco
+CA_ORGANIZATION=Your Organization
+CA_ORGANIZATIONAL_UNIT=IT Department
+CA_COMMON_NAME=Your CA Name
+CA_EMAIL=ca@yourdomain.com
+
+# Security Settings
+BCRYPT_ROUNDS=12
+SESSION_MAX_AGE=86400
+RATE_LIMIT_WINDOW_MS=900000
+RATE_LIMIT_MAX_REQUESTS=100
+
+# X.509/Revocation Settings
+CA_PATH_LENGTH_CONSTRAINT=0
+POLICY_REQUIRE_EXPLICIT=false
+POLICY_INHIBIT_MAPPING=false
+CRL_DISTRIBUTION_POINT=http://yourdomain.com/crl
+OCSP_URL=http://yourdomain.com/ocsp
+```
+
+## 🔄 Environment Switching
+
+### **Development → Production**
+```bash
+# Stop development server
+# Copy production environment
+cp env.docker .env
+
+# Start with Docker
+docker compose up --build
+```
+
+### **Production → Development**
+```bash
+# Stop Docker containers
+docker compose down
+
+# Copy development environment
 cp env.sqlite .env
+
+# Start development server
 npm run dev
 ```
-Helpful DB commands:
+
+## 🛠️ Available Scripts
+
+### **Development Scripts**
 ```bash
-npm run db:push:sqlite
-npm run db:push:postgresql
-npm run db:studio:sqlite
-npm run db:studio:postgresql
+npm run dev              # Next.js dev server (port 3000)
+npm run dev:custom       # Custom server with Socket.IO (port 3000)
+npm run build           # Production build
+npm run start           # Production custom server (port 3000)
+npm run start:next      # Production standard server (port 3000)
 ```
 
-## Data Model (Prisma)
-- **User**: role, status, lastLogin → relations to `AuditLog`, `Certificate`, `CertificateRevocation`
-- **CAConfig**: subjectDN, encrypted privateKey, certificate, csr, status, validity, `crlNumber`, `crlDistributionPoint`, `ocspUrl`
-- **Certificate**: serialNumber, subject/issuer, PEM, optional encrypted privateKey/CSR, type, status, algorithm, validity, SANs, fingerprint, `lastValidated`
-- **CertificateRevocation**: serialNumber, reason, dates, actor
-- **CRL**: crlNumber, PEM, issuedAt/nextUpdate, CA relation
-- **AuditLog**: action, user info, description, metadata
-- **NotificationSetting** and **NotificationHistory**; **SystemConfig**
-
-## API Overview
-- **Auth**: `POST /api/auth/signin`, `POST /api/auth/signout`, `GET /api/auth/session`
-- **CA**: `GET /api/ca/status`, `POST /api/ca/initialize`, `POST /api/ca/upload-certificate`, `GET /api/ca/[id]`
-- **Certificates**:
-  - `GET /api/certificates`
-  - `POST /api/certificates/issue`
-  - `POST /api/certificates/[serialNumber]/renew`
-  - `POST /api/certificates/revoke`
-  - `GET /api/certificates/[serialNumber]/export`
-  - Validation: `POST /api/certificates/validate`, `POST /api/certificates/validate/batch`, `GET /api/certificates/validate?action=statistics`
-  - `GET /api/certificates/stats`
-- **CRL**: `GET /api/crl`, `POST /api/crl/generate` (full/delta), `POST /api/crl/validate`, `GET /api/crl/export`, `GET /api/crl/download/[crlNumber]`, `GET /api/crl/status`, `GET /api/crl/revoked`
-- **Audit**: `GET /api/audit`, `GET /api/audit/export`
-- **Users**: CRUD + password reset/update
-- **Notifications**: CRUD + history
-
-## Security Features
-- **Auth/RBAC**: NextAuth with roles; session and JWT support
-- **Data protection**: AES-256 at-rest encryption, Prisma query safety, input validation/sanitization
-- **Headers/Rate limit**: Strict security headers, CSP, rate limiting, origin validation
-- **Audit**: Every sensitive operation recorded with metadata
-
-## Certificate Validation Improvements
-- Chain validation (RFC 5280 §6.1) with configurable depth
-- Signature verification (RFC 5280 §4.1.1.3)
-- Expiration checks with days-until-expiry
-- Validation Service with DB revocation checks, audit logging, batch ops
-- API endpoints for single/batch validation + statistics
-- UI page at `/certificates/validate` with real-time results and chain details
-- Schema updates: `Certificate.lastValidated`, new audit actions
-
-## X.509 Standards Compliance Enhancements
-- Path length constraints for CA certificates (`CA_PATH_LENGTH_CONSTRAINT`)
-- Purpose-specific key usage; critical flags for CA extensions
-- Policy and name constraints; enhanced Extended Key Usage
-- Pre-signing extension validation for compliance
-
-## CRL Implementation Enhancements
-- CRL numbering with DB tracking; authority key identifier; distribution points
-- Full and delta CRLs with delta indicators and shorter validity
-- Required extensions: `cRLNumber`, `authorityKeyIdentifier`, `cRLDistributionPoints`, `issuingDistributionPoint`, `authorityInfoAccess`; delta support
-- Validation utilities: extension checks, compliance issues, CRL info extraction
-- API: generate (full/delta), validate, statistics; RBAC + audit
-- UI: Tabbed CRL page (Overview, Generate, Validate, Revoked) with live stats and downloads
-
-## Commands and Scripts
+### **Database Scripts**
 ```bash
-# App
-npm run dev     # Dev server (port 4000)
-npm run build   # Production build
-npm run start   # Production server (standalone, port 4000 by default)
-
-# Docker
-docker-compose up --build
-docker-compose up -d --build
-docker-compose down
-docker-compose logs -f
-
-# Testing
-npm test
-npm run test:coverage
-
-# Lint/Format
-npm run lint
-npm run format
+npm run db:push:sqlite      # Push schema to SQLite
+npm run db:push:postgresql  # Push schema to PostgreSQL
+npm run db:studio:sqlite    # Open Prisma Studio (SQLite)
+npm run db:studio:postgresql # Open Prisma Studio (PostgreSQL)
 ```
 
-## Troubleshooting
+### **Testing Scripts**
 ```bash
-# Port in use
+npm test                 # Run tests
+npm run test:coverage    # Run tests with coverage
+npm run lint            # Run ESLint
+npm run format          # Format code
+```
+
+## 🐳 Docker Deployment
+
+### **Standard Deployment** (Custom Server + Socket.IO)
+```bash
+# Build and start
+docker compose up --build
+
+# Run in background
+docker compose up -d --build
+
+# View logs
+docker compose logs -f
+
+# Stop
+docker compose down
+```
+
+### **Simple Deployment** (Standard Next.js Server - Recommended)
+```bash
+# Use simple configuration
+docker compose -f docker-compose.simple.yml up --build
+
+# Run in background
+docker compose -f docker-compose.simple.yml up -d --build
+```
+
+### **Docker Configuration**
+- **Port**: 3000 (exposed to host)
+- **Database**: PostgreSQL with health checks
+- **Environment**: Production mode with optimized settings
+- **Health Check**: Available at `/api/health`
+
+## 🔧 Troubleshooting
+
+### **Port Issues**
+```bash
+# Kill process using port 3000
 lsof -ti:3000 | xargs kill -9
-# or for dev port
-lsof -ti:4000 | xargs kill -9
 
-# DB issues (SQLite)
-rm -f db/custom.db && npm run db:push
+# Check what's using the port
+netstat -tulpn | grep 3000
+```
 
-# Build issues
+### **Database Issues**
+```bash
+# Reset SQLite database
+rm -f db/custom.db && npm run db:push:sqlite
+
+# Check PostgreSQL connection
+docker compose exec postgres pg_isready -U postgres
+```
+
+### **Build Issues**
+```bash
+# Clean build cache
 rm -rf .next && npm run build
 
-# Docker rebuild
+# Rebuild Docker images
 docker system prune -a
-docker-compose build --no-cache
-
-# Permissions
-chmod +x scripts/init-db.sh
-chmod 600 .env
+docker compose build --no-cache
 ```
 
-## First-Time Use Flow
-1. Create admin account → `/auth/signin` → “Create Account”
-2. Configure CA → `/ca/setup` → generate CSR → sign with root CA → upload
-3. Use the system: `/certificates/issue`, `/certificates`, `/crl`, `/audit`, `/users`
+### **Docker Issues**
+```bash
+# Check container status
+docker compose ps
 
-## Important Security Notes
-- Rotate and harden `NEXTAUTH_SECRET`, `ENCRYPTION_KEY`, DB passwords
-- Restrict DB access; enable TLS in production; backup regularly
-- Never commit `.env`; use environment-specific secrets; consider a secret manager
+# View detailed logs
+docker compose logs ca-management
 
-## Project Structure
+# Reset everything
+docker compose down -v
+docker system prune -f
+```
+
+### **Environment Issues**
+```bash
+# Check environment variables
+docker compose exec ca-management env
+
+# Verify .env file
+cat .env | grep -E "(DATABASE_URL|NEXTAUTH_SECRET|ENCRYPTION_KEY)"
+```
+
+## 📊 Health Checks
+
+### **Application Health**
+```bash
+# Check if app is running
+curl http://localhost:3000/api/health
+
+# Expected response:
+{
+  "status": "healthy",
+  "checks": {
+    "database": true,
+    "auth": true,
+    "notifications": true
+  }
+}
+```
+
+### **Database Health**
+```bash
+# SQLite
+sqlite3 db/custom.db "SELECT 1;"
+
+# PostgreSQL (Docker)
+docker compose exec postgres psql -U postgres -d ca_management -c "SELECT 1;"
+```
+
+## 🔐 Security Configuration
+
+### **First-Time Setup**
+1. **Create Admin Account**: Visit `/auth/signin` → "Create Account"
+2. **Configure CA**: Visit `/ca/setup` → Generate CSR → Sign with root CA → Upload
+3. **Start Using**: Navigate to `/certificates/issue`, `/certificates`, `/crl`, `/audit`, `/users`
+
+### **Security Best Practices**
+- ✅ **Rotate Secrets**: Change `NEXTAUTH_SECRET` and `ENCRYPTION_KEY` in production
+- ✅ **Database Security**: Use strong passwords, enable TLS, restrict access
+- ✅ **Environment Files**: Never commit `.env` files
+- ✅ **Backup Strategy**: Regular database backups
+- ✅ **Access Control**: Use RBAC roles (Admin/Operator/Viewer)
+
+## 📁 Project Structure
 ```
 src/
 ├── app/                    # Next.js App Router pages
@@ -212,16 +300,30 @@ src/
 └── middleware-security.ts # Security middleware
 ```
 
-## License
-This project is licensed under the MIT License. See the `LICENSE` file for details.
+## 📚 Additional Resources
 
-## Contributing
+### **Documentation**
+- `DOCKER_TROUBLESHOOTING.md` - Comprehensive Docker deployment guide
+- `test/README.md` - Testing framework documentation
+
+### **Configuration Files**
+- `docker-compose.yml` - Standard Docker deployment
+- `docker-compose.simple.yml` - Simple Docker deployment (recommended)
+- `Dockerfile` - Docker image configuration
+- `jest.config.js` - Test configuration
+- `tsconfig.json` - TypeScript configuration
+
+## 🤝 Contributing
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
 3. Commit your changes (`git commit -m 'Add some amazing feature'`)
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-## Support
+## 📞 Support
 - Create an issue in the repository
 - Review the troubleshooting section above
+- Check `DOCKER_TROUBLESHOOTING.md` for Docker-specific issues
+
+## 📄 License
+This project is licensed under the MIT License. See the `LICENSE` file for details.
