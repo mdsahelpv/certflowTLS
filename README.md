@@ -41,6 +41,15 @@ npm run dev
 # App: http://localhost:3000
 ```
 
+### **Development with Debug Mode**
+```bash
+# Start with debug logging
+npm run dev:debug
+
+# Start custom server with Socket.IO
+npm run dev:custom
+```
+
 ### **Production Environment** (Docker + PostgreSQL)
 ```bash
 # 1. Setup environment (PostgreSQL)
@@ -51,6 +60,22 @@ docker compose up --build
 
 # 3. Access application
 # App: http://localhost:3000
+```
+
+### **Docker Commands**
+```bash
+# Build and run with Docker Compose
+npm run docker:compose
+
+# View logs
+npm run docker:compose:logs
+
+# Stop containers
+npm run docker:compose:down
+
+# Build standalone image
+npm run docker:build
+npm run docker:run
 ```
 
 ## 📋 Environment Configuration
