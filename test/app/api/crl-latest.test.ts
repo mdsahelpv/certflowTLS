@@ -1,3 +1,6 @@
+/**
+ * @jest-environment node
+ */
 import { NextRequest } from 'next/server'
 import { GET as GET_LATEST } from '@/app/api/crl/download/latest/route'
 import { GET as GET_PUBLIC_BY_NUMBER } from '@/app/api/crl/download/[crlNumber]/public/route'

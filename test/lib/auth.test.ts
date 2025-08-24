@@ -1,9 +1,12 @@
 import { AuthService } from '@/lib/auth'
-import { mockPrisma } from '../utils/test-utils'
+import { db } from '@/lib/db'
 import bcrypt from 'bcryptjs'
 
-// Mock bcrypt
+// Mock dependencies
+jest.mock('@/lib/db')
 jest.mock('bcryptjs')
+
+const mockedDb = db as jest.Mocked<typeof db>
 const mockedBcrypt = bcrypt as jest.Mocked<typeof bcrypt>
 
 describe('AuthService', () => {
@@ -89,13 +92,13 @@ describe('AuthService', () => {
         updatedAt: new Date(),
       }
       
-      mockPrisma.user.create.mockResolvedValue(mockUser as any)
-      mockPrisma.user.findUnique.mockResolvedValue(mockUser as any)
+      mockedDb.user.create.mockResolvedValue(mockUser as any)
+      mockedDb.user.findUnique.mockResolvedValue(mockUser as any)
       
       const result = await AuthService.createUser(userData)
       
       expect(mockedBcrypt.hash).toHaveBeenCalledWith(userData.password, 12)
-      expect(mockPrisma.user.create).toHaveBeenCalledWith({
+      expect(mockedDb.user.create).toHaveBeenCalledWith({
         data: {
           ...userData,
           password: hashedPassword,
@@ -123,12 +126,12 @@ describe('AuthService', () => {
         status: 'ACTIVE' as const,
       }
       
-      mockPrisma.user.create.mockResolvedValue(mockUser as any)
-      mockPrisma.user.findUnique.mockResolvedValue(mockUser as any)
+      mockedDb.user.create.mockResolvedValue(mockUser as any)
+      mockedDb.user.findUnique.mockResolvedValue(mockUser as any)
       
       await AuthService.createUser(userData)
       
-      expect(mockPrisma.user.create).toHaveBeenCalledWith({
+      expect(mockedDb.user.create).toHaveBeenCalledWith({
         data: {
           ...userData,
           password: 'hashed',
@@ -155,17 +158,17 @@ describe('AuthService', () => {
         updatedAt: new Date(),
       }
       
-      mockPrisma.user.findUnique.mockResolvedValue(mockUser as any)
+      mockedDb.user.findUnique.mockResolvedValue(mockUser as any)
       mockedBcrypt.compare.mockResolvedValue(true as never)
-      mockPrisma.user.update.mockResolvedValue(mockUser as any)
+      mockedDb.user.update.mockResolvedValue(mockUser as any)
       
       const result = await AuthService.authenticateUser(username, password)
       
-      expect(mockPrisma.user.findUnique).toHaveBeenCalledWith({
+      expect(mockedDb.user.findUnique).toHaveBeenCalledWith({
         where: { username },
       })
       expect(mockedBcrypt.compare).toHaveBeenCalledWith(password, mockUser.password)
-      expect(mockPrisma.user.update).toHaveBeenCalledWith({
+      expect(mockedDb.user.update).toHaveBeenCalledWith({
         where: { id: mockUser.id },
         data: { lastLogin: expect.any(Date) },
       })
@@ -177,7 +180,7 @@ describe('AuthService', () => {
       const username = 'nonexistent'
       const password = 'testpassword'
       
-      mockPrisma.user.findUnique.mockResolvedValue(null)
+      mockedDb.user.findUnique.mockResolvedValue(null)
       
       const result = await AuthService.authenticateUser(username, password)
       
@@ -198,7 +201,7 @@ describe('AuthService', () => {
         status: 'SUSPENDED' as const,
       }
       
-      mockPrisma.user.findUnique.mockResolvedValue(mockUser as any)
+      mockedDb.user.findUnique.mockResolvedValue(mockUser as any)
       
       const result = await AuthService.authenticateUser(username, password)
       
@@ -219,13 +222,13 @@ describe('AuthService', () => {
         status: 'ACTIVE' as const,
       }
       
-      mockPrisma.user.findUnique.mockResolvedValue(mockUser as any)
+      mockedDb.user.findUnique.mockResolvedValue(mockUser as any)
       mockedBcrypt.compare.mockResolvedValue(false as never)
       
       const result = await AuthService.authenticateUser(username, password)
       
       expect(result).toBeNull()
-      expect(mockPrisma.user.update).not.toHaveBeenCalled()
+      expect(mockedDb.user.update).not.toHaveBeenCalled()
     })
   })
 

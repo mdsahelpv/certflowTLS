@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import type { NextRequest } from 'next/server';
 import { securityMiddleware } from './middleware-security';
-import { logger } from '@/lib/logger';
+import { logger } from '@/lib/logger-edge';
 
 export async function middleware(request: NextRequest) {
   const startTime = Date.now();

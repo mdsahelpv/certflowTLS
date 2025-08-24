@@ -1,3 +1,6 @@
+/**
+ * @jest-environment node
+ */
 import { NextRequest } from 'next/server'
 import { POST as OCSP_BINARY } from '@/app/api/ocsp/binary/route'
 import { db } from '@/lib/db'
