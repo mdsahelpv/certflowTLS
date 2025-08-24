@@ -122,6 +122,7 @@
     "eslint-config-next": "15.3.5",
     "jest": "^30.0.5",
     "jest-environment-jsdom": "^30.0.5",
+    "next": "15.3.5",
     "nodemon": "^3.1.10",
     "tailwindcss": "^4",
     "ts-jest": "^29.4.1",
