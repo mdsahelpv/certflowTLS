@@ -13,35 +13,38 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 120s
+    # Simplified startup command for debugging
     command: >
       sh -c "
-        echo '⏳ Waiting for PostgreSQL to be ready...' &&
+        echo '🔍 DEBUG MODE: Starting application...' &&
+        echo '📁 Current directory: ' && pwd &&
+        echo '📁 Directory contents: ' && ls -la &&
+        echo '🔧 Environment variables: ' &&
+        echo '  NODE_ENV: $NODE_ENV' &&
+        echo '  PORT: $PORT' &&
+        echo '  DATABASE_URL: $DATABASE_URL' &&
+        echo '  LOG_LEVEL: $LOG_LEVEL' &&
+        echo '⏳ Waiting for PostgreSQL...' &&
         until pg_isready -h postgres -U $POSTGRES_USER -d $POSTGRES_DB; do
           echo 'PostgreSQL is unavailable - sleeping' &&
           sleep 2
         done &&
         echo '✅ PostgreSQL is ready!' &&
-        echo '🔧 Using PostgreSQL schema...' &&
+        echo '🔧 Setting up database...' &&
         cp prisma/schema.prisma.psql prisma/schema.prisma &&
-        echo '🔧 Generating Prisma client...' &&
         npx prisma generate &&
-        echo '📊 Pushing database schema...' &&
         npx prisma db push &&
-        echo '✅ Database initialized! Starting application...' &&
-        echo '🚀 Starting server on port $PORT' &&
-        echo '📝 Logs will be available in /app/logs/app.log' &&
+        echo '✅ Database setup complete!' &&
+        echo '🚀 Starting server...' &&
+        echo '📝 Log level: $LOG_LEVEL' &&
+        echo '📝 Log format: $LOG_FORMAT' &&
+        echo '📝 Log file: $LOG_FILE' &&
         npx tsx server.ts
       "
     environment:
       - PORT=3000
       - NODE_ENV=production
-      - LOG_LEVEL=info
+      - LOG_LEVEL=debug
       - LOG_FORMAT=text
       - LOG_FILE=/app/logs/app.log
 
