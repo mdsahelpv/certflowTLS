@@ -5,6 +5,7 @@ import { Server } from 'socket.io';
 import next from 'next';
 import { SystemInitializer } from './src/lib/init';
 import { CAService } from './src/lib/ca';
+import { logger } from './src/lib/logger';
 
 const dev = process.env.NODE_ENV !== 'production';
 const currentPort = parseInt(process.env.PORT || '3000'); // Changed default to 3000
@@ -13,8 +14,11 @@ const hostname = '0.0.0.0';
 // Custom server with Socket.IO integration
 async function createCustomServer() {
   try {
-    console.log(`🚀 Starting server in ${dev ? 'development' : 'production'} mode`);
-    console.log(`📡 Server will listen on port ${currentPort}`);
+    logger.server.info(`Starting server in ${dev ? 'development' : 'production'} mode`, {
+      port: currentPort,
+      hostname,
+      nodeEnv: process.env.NODE_ENV
+    });
     
     // Create Next.js app
     const nextApp = next({ 
@@ -24,11 +28,11 @@ async function createCustomServer() {
       conf: dev ? undefined : { distDir: './.next' }
     });
 
-    console.log('📦 Preparing Next.js app...');
+    logger.server.info('Preparing Next.js app...');
     await nextApp.prepare();
     const handle = nextApp.getRequestHandler();
 
-    console.log('🔧 Initializing system services...');
+    logger.server.info('Initializing system services...');
     // Start background schedulers
     await SystemInitializer.initialize();
     CAService.startCRLScheduler();
@@ -55,15 +59,19 @@ async function createCustomServer() {
 
     // Start the server
     server.listen(currentPort, hostname, () => {
-      console.log(`✅ Server ready on http://${hostname}:${currentPort}`);
-      console.log(`🔌 Socket.IO server running at ws://${hostname}:${currentPort}/api/socketio`);
-      console.log(`🌍 Environment: ${process.env.NODE_ENV}`);
-      console.log(`🗄️  Database URL: ${process.env.DATABASE_URL ? 'Configured' : 'Not configured'}`);
+      logger.server.info('Server ready', {
+        httpUrl: `http://${hostname}:${currentPort}`,
+        wsUrl: `ws://${hostname}:${currentPort}/api/socketio`,
+        environment: process.env.NODE_ENV,
+        databaseConfigured: !!process.env.DATABASE_URL
+      });
     });
 
   } catch (err) {
-    console.error('❌ Server startup error:', err);
-    console.error('Stack trace:', err instanceof Error ? err.stack : 'No stack trace');
+    logger.server.error('Server startup error', {
+      error: err instanceof Error ? err.message : String(err),
+      stack: err instanceof Error ? err.stack : undefined
+    });
     process.exit(1);
   }
 }

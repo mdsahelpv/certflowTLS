@@ -1,11 +1,12 @@
 import { db } from '@/lib/db';
 import { AuthService } from '@/lib/auth';
 import { NotificationService } from '@/lib/notifications';
+import { logger } from '@/lib/logger';
 
 export class SystemInitializer {
   static async initialize(): Promise<void> {
     try {
-      console.log('Initializing system...');
+      logger.info('Initializing system...');
       
       // Create default admin user if not exists
       await this.createDefaultAdmin();
@@ -16,9 +17,12 @@ export class SystemInitializer {
       // Create default system configurations
       await this.createSystemConfigs();
       
-      console.log('System initialization completed successfully');
+      logger.info('System initialization completed successfully');
     } catch (error) {
-      console.error('System initialization failed:', error);
+      logger.error('System initialization failed', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
     }
   }
 
@@ -28,7 +32,7 @@ export class SystemInitializer {
       const adminPassword = process.env.ADMIN_PASSWORD;
 
       if (!adminUsername || !adminPassword) {
-        console.warn('ADMIN_USERNAME or ADMIN_PASSWORD not set; skipping default admin creation');
+        logger.warn('ADMIN_USERNAME or ADMIN_PASSWORD not set; skipping default admin creation');
         return;
       }
 
@@ -44,12 +48,15 @@ export class SystemInitializer {
           name: 'Default Administrator',
           role: 'ADMIN',
         });
-        console.log(`Default admin user '${adminUsername}' created`);
+        logger.auth.info(`Default admin user created`, { username: adminUsername });
       } else {
-        console.log(`Default admin user '${adminUsername}' already exists`);
+        logger.auth.info(`Default admin user already exists`, { username: adminUsername });
       }
     } catch (error) {
-      console.error('Failed to create default admin user:', error);
+      logger.auth.error('Failed to create default admin user', {
+        error: error instanceof Error ? error.message : String(error),
+        username: process.env.ADMIN_USERNAME
+      });
     }
   }
 
@@ -103,10 +110,13 @@ export class SystemInitializer {
           await db.systemConfig.create({
             data: config,
           });
-          console.log(`System config '${config.key}' created`);
+          logger.info(`System config created`, { key: config.key, value: config.value });
         }
       } catch (error) {
-        console.error(`Failed to create system config '${config.key}':`, error);
+        logger.error(`Failed to create system config`, {
+          key: config.key,
+          error: error instanceof Error ? error.message : String(error)
+        });
       }
     }
   }
@@ -115,9 +125,11 @@ export class SystemInitializer {
     try {
       // Start the notification scheduler
       NotificationService.startNotificationScheduler();
-      console.log('Notification scheduler started');
+      logger.notification.info('Notification scheduler started');
     } catch (error) {
-      console.error('Failed to start notification scheduler:', error);
+      logger.notification.error('Failed to start notification scheduler', {
+        error: error instanceof Error ? error.message : String(error)
+      });
     }
   }
 
@@ -141,7 +153,9 @@ export class SystemInitializer {
       await db.$queryRaw`SELECT 1`;
       checks.database = true;
     } catch (error) {
-      console.error('Database health check failed:', error);
+      logger.database.error('Database health check failed', {
+        error: error instanceof Error ? error.message : String(error)
+      });
     }
 
     try {
@@ -151,7 +165,9 @@ export class SystemInitializer {
       });
       checks.auth = adminCount > 0;
     } catch (error) {
-      console.error('Auth health check failed:', error);
+      logger.auth.error('Auth health check failed', {
+        error: error instanceof Error ? error.message : String(error)
+      });
     }
 
     try {
@@ -159,7 +175,9 @@ export class SystemInitializer {
       const notificationCount = await db.notificationSetting.count();
       checks.notifications = notificationCount >= 0; // At least 0 means the table exists
     } catch (error) {
-      console.error('Notifications health check failed:', error);
+      logger.notification.error('Notifications health check failed', {
+        error: error instanceof Error ? error.message : String(error)
+      });
     }
 
     const status = Object.values(checks).every(check => check) ? 'healthy' : 'unhealthy';

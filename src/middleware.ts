@@ -2,8 +2,21 @@ import { NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import type { NextRequest } from 'next/server';
 import { securityMiddleware } from './middleware-security';
+import { logger } from '@/lib/logger';
 
 export async function middleware(request: NextRequest) {
+  const startTime = Date.now();
+  const requestId = crypto.randomUUID();
+  
+  // Log incoming request
+  logger.info('Incoming request', {
+    requestId,
+    method: request.method,
+    url: request.url,
+    userAgent: request.headers.get('user-agent'),
+    ip: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown'
+  });
+
   // Bypass security middleware for test page
   if (request.nextUrl.pathname === '/test') {
     return NextResponse.next();
@@ -15,7 +28,8 @@ export async function middleware(request: NextRequest) {
     return securityResponse;
   }
 
-  const token = await getToken({ req: request });
+  // Check if user is authenticated for protected routes
+  const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
   const isAuthenticated = !!token;
 
   // Define protected routes
@@ -40,11 +54,27 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith(route)
   );
 
-  // Redirect unauthenticated users to login page for protected routes
+  // Redirect to login if accessing protected route without authentication
   if (isProtectedRoute && !isAuthenticated) {
-    const loginUrl = new URL('/auth/signin', request.url);
-    loginUrl.searchParams.set('callbackUrl', pathname);
-    return NextResponse.redirect(loginUrl);
+    logger.warn('Unauthorized access attempt', {
+      requestId,
+      path: request.nextUrl.pathname,
+      ip: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown'
+    });
+    
+    const response = NextResponse.redirect(new URL('/auth/signin', request.url));
+    
+    // Log response
+    logger.info('Request completed', {
+      requestId,
+      method: request.method,
+      url: request.url,
+      statusCode: 302,
+      duration: Date.now() - startTime,
+      action: 'redirect_to_login'
+    });
+    
+    return response;
   }
 
   // Check role-based permissions
@@ -68,7 +98,21 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 
-  return NextResponse.next();
+  // Allow the request to proceed
+  const response = NextResponse.next();
+  
+  // Log successful request
+  logger.info('Request completed', {
+    requestId,
+    method: request.method,
+    url: request.url,
+    statusCode: response.status,
+    duration: Date.now() - startTime,
+    authenticated: isAuthenticated,
+    userId: token?.id
+  });
+
+  return response;
 }
 
 export const config = {
