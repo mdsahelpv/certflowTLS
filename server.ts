@@ -7,12 +7,15 @@ import { SystemInitializer } from './src/lib/init';
 import { CAService } from './src/lib/ca';
 
 const dev = process.env.NODE_ENV !== 'production';
-const currentPort = parseInt(process.env.PORT || '4000');
+const currentPort = parseInt(process.env.PORT || '3000'); // Changed default to 3000
 const hostname = '0.0.0.0';
 
 // Custom server with Socket.IO integration
 async function createCustomServer() {
   try {
+    console.log(`🚀 Starting server in ${dev ? 'development' : 'production'} mode`);
+    console.log(`📡 Server will listen on port ${currentPort}`);
+    
     // Create Next.js app
     const nextApp = next({ 
       dev,
@@ -21,9 +24,11 @@ async function createCustomServer() {
       conf: dev ? undefined : { distDir: './.next' }
     });
 
+    console.log('📦 Preparing Next.js app...');
     await nextApp.prepare();
     const handle = nextApp.getRequestHandler();
 
+    console.log('🔧 Initializing system services...');
     // Start background schedulers
     await SystemInitializer.initialize();
     CAService.startCRLScheduler();
@@ -50,12 +55,15 @@ async function createCustomServer() {
 
     // Start the server
     server.listen(currentPort, hostname, () => {
-      console.log(`> Ready on http://${hostname}:${currentPort}`);
-      console.log(`> Socket.IO server running at ws://${hostname}:${currentPort}/api/socketio`);
+      console.log(`✅ Server ready on http://${hostname}:${currentPort}`);
+      console.log(`🔌 Socket.IO server running at ws://${hostname}:${currentPort}/api/socketio`);
+      console.log(`🌍 Environment: ${process.env.NODE_ENV}`);
+      console.log(`🗄️  Database URL: ${process.env.DATABASE_URL ? 'Configured' : 'Not configured'}`);
     });
 
   } catch (err) {
-    console.error('Server startup error:', err);
+    console.error('❌ Server startup error:', err);
+    console.error('Stack trace:', err instanceof Error ? err.stack : 'No stack trace');
     process.exit(1);
   }
 }
