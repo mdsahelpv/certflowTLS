@@ -1,4 +1,8 @@
 // server.ts - Next.js Standalone + Socket.IO
+import { AsyncLocalStorage } from 'node:async_hooks';
+if (global.AsyncLocalStorage === undefined) {
+  global.AsyncLocalStorage = AsyncLocalStorage;
+}
 import { setupSocket } from './src/lib/socket';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
