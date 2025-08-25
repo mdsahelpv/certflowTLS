@@ -1,24 +1,37 @@
 ![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/markrubio18/CER?utm_source=oss&utm_medium=github&utm_campaign=markrubio18%2FCER&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
 
-## Certificate Authority Management System
+# 🏢 Enterprise Certificate Authority Management System
 
 An enterprise-grade subordinate CA manager to issue, renew, revoke, and export certificates; manage CRLs; audit all actions; send notifications; and provide real-time updates. Built with Next.js 15, TypeScript, Prisma, Tailwind + shadcn/ui, and Socket.IO.
 
-### Core Features
-- **CA lifecycle**: Initialize CA, generate CSR, upload signed CA certificate, track validity and status
-- **Certificates**: Issue, renew, revoke; export (PEM/DER/PKCS#12); SANs; algorithms (RSA/ECDSA/Ed25519)
+## ✨ Core Features
+
+### 🔐 Certificate Management
+- **CA Lifecycle**: Initialize CA, generate CSR, upload signed CA certificate, track validity and status
+- **Certificate Operations**: Issue, renew, revoke; export (PEM/DER/PKCS#12); SANs support (DNS, IP, wildcards); algorithms (RSA/ECDSA/Ed25519)
 - **Certificate Validation**: Comprehensive validation with chain verification, OCSP checking, and extension validation
+- **Multi-CA Support**: Manage multiple certificate authorities
+
+### 🔄 Revocation & Status
 - **CRLs**: Generate, validate, download full and delta CRLs with numbering and extensions
 - **OCSP Responder**: Real-time certificate status checking with RSA-signed responses
+- **CRL Distribution Points**: Automatic inclusion in issued certificates
+- **Authority Information Access**: OCSP and CA Issuers URLs in certificates
+
+### 🔒 Security & Compliance
 - **Audit**: Detailed audit trail for security and compliance
 - **RBAC**: Roles (Admin/Operator/Viewer) gate all actions
 - **Security**: AES-256 at-rest encryption, bcrypt, strict headers, rate limits, CSP
+- **X.509 Compliance**: Enterprise PKI standards with proper extensions
+
+### 📢 Notifications & Monitoring
 - **Notifications**: Email/webhook settings and delivery history (expiry, CRL updates, alerts)
+- **Webhook Delivery**: Comprehensive webhook delivery tracking with retry logic
 - **Real-time**: Socket.IO at `/api/socketio` for live updates
-- **Multi-CA Support**: Manage multiple certificate authorities
 - **Logging**: Structured logging with file rotation and service-specific loggers
 
-### Tech Stack
+## 🛠️ Tech Stack
+
 - **Frontend**: Next.js App Router, React 19, Tailwind 4, shadcn/ui
 - **Backend**: Next.js route handlers, custom server (`server.ts`) + Socket.IO
 - **Database**: Prisma with SQLite (dev) and PostgreSQL (prod via Docker)
@@ -29,20 +42,25 @@ An enterprise-grade subordinate CA manager to issue, renew, revoke, and export c
 
 ### **Development Environment** (SQLite + Next.js Dev Server)
 ```bash
-# 1. Install dependencies
+# 1. Clone repository
+git clone <your-repo-url>
+cd CER
+
+# 2. Install dependencies
 npm install
 
-# 2. Setup environment (SQLite)
+# 3. Setup environment (SQLite)
 cp env.sqlite .env
 
-# 3. Initialize database
+# 4. Initialize database
 npm run db:push:sqlite
 
-# 4. Start development server
+# 5. Start development server
 npm run dev
 
-# 5. Access application
+# 6. Access application
 # App: http://localhost:3000
+# Default admin: admin / admin123
 ```
 
 ### **Development with Debug Mode**
@@ -91,6 +109,7 @@ npm run docker:run
 ### **Environment Files**
 - `env.sqlite` - Development environment (SQLite database)
 - `env.docker` - Production environment (PostgreSQL via Docker)
+- `env.postgresql` - PostgreSQL environment
 - `env.example` - Template with all available options
 
 ### **Required Environment Variables**
@@ -122,8 +141,15 @@ RATE_LIMIT_MAX_REQUESTS=100
 CA_PATH_LENGTH_CONSTRAINT=0
 POLICY_REQUIRE_EXPLICIT=false
 POLICY_INHIBIT_MAPPING=false
-CRL_DISTRIBUTION_POINT=http://yourdomain.com/crl
-OCSP_URL=http://yourdomain.com/ocsp
+CRL_DISTRIBUTION_POINT=https://yourdomain.com/api/crl/download/latest
+OCSP_URL=https://yourdomain.com/api/ocsp
+CRL_PUBLICATION_ENDPOINTS=https://ha1.yourdomain.com/crl,https://ha2.yourdomain.com/crl
+
+# Webhook Configuration
+WEBHOOK_DEFAULT_TIMEOUT=10000
+WEBHOOK_DEFAULT_RETRIES=3
+WEBHOOK_DEFAULT_RETRY_DELAY=1000
+WEBHOOK_MAX_RETRY_DELAY=30000
 ```
 
 ## 🔄 Environment Switching
@@ -172,6 +198,13 @@ npm run db:studio:postgresql # Open Prisma Studio (PostgreSQL)
 npm run db:generate         # Generate Prisma client
 npm run db:migrate          # Run database migrations
 npm run db:reset            # Reset database
+```
+
+### **Webhook Migration Scripts**
+```bash
+npm run migrate:webhook         # Migrate webhook schema (development)
+npm run migrate:webhook:sqlite  # Migrate webhook schema (SQLite)
+npm run migrate:webhook:postgresql # Migrate webhook schema (PostgreSQL)
 ```
 
 ### **Testing Scripts**
@@ -237,6 +270,58 @@ docker compose -f docker-compose.simple.yml up -d --build
 - **Environment**: Production mode with optimized settings
 - **Health Check**: Available at `/api/health`
 
+## 🔐 Security Configuration
+
+### **First-Time Setup**
+1. **Create Admin Account**: Visit `/auth/signin` → "Create Account"
+2. **Configure CA**: Visit `/ca/setup` → Generate CSR → Sign with root CA → Upload
+3. **Start Using**: Navigate to `/certificates/issue`, `/certificates`, `/crl`, `/audit`, `/users`
+
+### **Security Best Practices**
+- ✅ **Rotate Secrets**: Change `NEXTAUTH_SECRET` and `ENCRYPTION_KEY` in production
+- ✅ **Database Security**: Use strong passwords, enable TLS, restrict access
+- ✅ **Environment Files**: Never commit `.env` files
+- ✅ **Backup Strategy**: Regular database backups
+- ✅ **Access Control**: Use RBAC roles (Admin/Operator/Viewer)
+- ✅ **Webhook Security**: Use HTTPS endpoints and webhook signatures
+
+## 📢 Webhook Notifications
+
+### **Setup Webhook Notifications**
+```bash
+# 1. Run webhook migration (if not done)
+npm run migrate:webhook:sqlite  # or postgresql
+
+# 2. Configure webhook in UI
+# Navigate to /notifications → Add Webhook
+
+# 3. Test webhook endpoint
+curl -X POST http://localhost:3000/api/notifications/test-webhook \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://api.example.com/webhook"}'
+```
+
+### **Webhook Configuration**
+```typescript
+{
+  "url": "https://api.example.com/webhook",
+  "timeout": 10000,
+  "retries": 3,
+  "secret": "your-webhook-secret"
+}
+```
+
+### **Monitor Webhook Deliveries**
+```bash
+# View delivery history
+curl http://localhost:3000/api/notifications/webhook-deliveries
+
+# Retry failed delivery
+curl -X POST http://localhost:3000/api/notifications/webhook-deliveries \
+  -H "Content-Type: application/json" \
+  -d '{"deliveryId": "webhook_delivery_id"}'
+```
+
 ## 🔧 Troubleshooting
 
 ### **Port Issues**
@@ -289,6 +374,19 @@ docker compose exec ca-management env
 cat .env | grep -E "(DATABASE_URL|NEXTAUTH_SECRET|ENCRYPTION_KEY)"
 ```
 
+### **Webhook Issues**
+```bash
+# Check webhook deliveries
+curl http://localhost:3000/api/notifications/webhook-deliveries
+
+# Test webhook endpoint
+curl -X POST http://localhost:3000/api/notifications/test-webhook \
+  -d '{"url": "https://httpbin.org/post"}'
+
+# Check webhook migration
+npm run migrate:webhook:sqlite
+```
+
 ## 📊 Health Checks
 
 ### **Application Health**
@@ -316,19 +414,16 @@ sqlite3 db/custom.db "SELECT 1;"
 docker compose exec postgres psql -U postgres -d ca_management -c "SELECT 1;"
 ```
 
-## 🔐 Security Configuration
+### **Webhook Health**
+```bash
+# Check webhook delivery status
+curl http://localhost:3000/api/notifications/webhook-deliveries?status=failed
 
-### **First-Time Setup**
-1. **Create Admin Account**: Visit `/auth/signin` → "Create Account"
-2. **Configure CA**: Visit `/ca/setup` → Generate CSR → Sign with root CA → Upload
-3. **Start Using**: Navigate to `/certificates/issue`, `/certificates`, `/crl`, `/audit`, `/users`
-
-### **Security Best Practices**
-- ✅ **Rotate Secrets**: Change `NEXTAUTH_SECRET` and `ENCRYPTION_KEY` in production
-- ✅ **Database Security**: Use strong passwords, enable TLS, restrict access
-- ✅ **Environment Files**: Never commit `.env` files
-- ✅ **Backup Strategy**: Regular database backups
-- ✅ **Access Control**: Use RBAC roles (Admin/Operator/Viewer)
+# Test webhook functionality
+curl -X POST http://localhost:3000/api/notifications/test-webhook \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://httpbin.org/post"}'
+```
 
 ## 📁 Project Structure
 ```
@@ -367,6 +462,7 @@ src/
 │   ├── ocsp.ts            # OCSP responder implementation
 │   ├── export.ts          # Certificate export utilities
 │   ├── notifications.ts   # Notification system
+│   ├── webhook-service.ts # Webhook delivery service
 │   ├── logger.ts          # Structured logging
 │   ├── log-rotation.ts    # Log rotation utilities
 │   ├── init.ts            # System initialization
@@ -383,6 +479,7 @@ src/
 ## 📚 Additional Resources
 
 ### **Documentation**
+- `WEBHOOK_IMPLEMENTATION.md` - Comprehensive webhook implementation guide
 - `DOCKER_TROUBLESHOOTING.md` - Comprehensive Docker deployment guide
 - `LOGGING.md` - Logging configuration and troubleshooting
 - `test/README.md` - Testing framework documentation
@@ -405,6 +502,7 @@ src/
 - `env.example` - Environment variables template
 
 ### **Scripts and Utilities**
+- `scripts/migrate-webhook-schema.js` - Webhook schema migration
 - `setup.sh` - Automated setup script
 - `docker-troubleshoot.sh` - Docker troubleshooting script
 - `create-admin.js` - Admin user creation script
@@ -421,6 +519,7 @@ src/
 - Create an issue in the repository
 - Review the troubleshooting section above
 - Check `DOCKER_TROUBLESHOOTING.md` for Docker-specific issues
+- Check `WEBHOOK_IMPLEMENTATION.md` for webhook-specific issues
 
 ## 📄 License
 This project is licensed under the MIT License. See the `LICENSE` file for details.
