@@ -6,6 +6,17 @@ import { POST as OCSP_BINARY } from '@/app/api/ocsp/binary/route'
 import { db } from '@/lib/db'
 import forge from 'node-forge'
 
+jest.mock('@/lib/db', () => ({
+  db: {
+    cAConfig: {
+      findFirst: jest.fn(),
+    },
+    certificate: {
+      findUnique: jest.fn(),
+    },
+  },
+}))
+
 function makeDummyCA() {
   const keys = forge.pki.rsa.generateKeyPair(2048)
   const cert = forge.pki.createCertificate()

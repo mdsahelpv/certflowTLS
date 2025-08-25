@@ -1,10 +1,23 @@
 import { render, screen, waitFor } from '../utils/test-utils'
+import userEvent from '@testing-library/user-event'
 import Layout from '@/components/layout'
 import { useAuth } from '@/hooks/useAuth'
 import { usePathname } from 'next/navigation'
 
-// Mock the useAuth hook
+// Mock hooks
 jest.mock('@/hooks/useAuth')
+jest.mock('next/navigation', () => ({
+  useRouter: () => ({
+    push: jest.fn(),
+    replace: jest.fn(),
+    refresh: jest.fn(),
+  }),
+  usePathname: jest.fn().mockReturnValue('/dashboard'),
+  useSearchParams: () => ({
+    get: jest.fn(),
+  }),
+}))
+
 const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>
 
 describe('Layout Component', () => {
@@ -34,8 +47,8 @@ describe('Layout Component', () => {
 
     render(<Layout>Test Content</Layout>)
 
-    // Should render SignInPage component
-    expect(screen.getByText('Sign In')).toBeInTheDocument()
+    // Should render SignInPage component, check for a more specific text
+    expect(screen.getByText('Sign in to your account')).toBeInTheDocument()
     expect(screen.queryByText('Test Content')).not.toBeInTheDocument()
   })
 
@@ -46,7 +59,7 @@ describe('Layout Component', () => {
         username: 'testuser',
         email: 'test@example.com',
         role: 'ADMIN',
-        permissions: ['ca:manage', 'certificate:issue', 'user:manage', 'audit:view'],
+        permissions: ['ca:manage', 'certificate:issue', 'user:manage', 'audit:view', 'config:manage'],
       },
       expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
     }
@@ -60,7 +73,7 @@ describe('Layout Component', () => {
     render(<Layout>Test Content</Layout>)
 
     await waitFor(() => {
-      expect(screen.getByText('CA Management')).toBeInTheDocument()
+      expect(screen.getAllByText('CA Management').length).toBeGreaterThan(0)
     })
 
     expect(screen.getByText('Home')).toBeInTheDocument()
@@ -114,11 +127,15 @@ describe('Layout Component', () => {
       isLoading: false,
     })
 
+    const user = userEvent.setup()
     render(<Layout>Test Content</Layout>)
 
-    await waitFor(() => {
-      expect(screen.getByText('Sign Out')).toBeInTheDocument()
-    })
+    // Click the user menu to open the dropdown. Use userEvent for more realistic interaction.
+    await user.click(screen.getByRole('button', { name: /testuser/i }))
+
+    // findByRole waits for the element to appear
+    const signOutButton = await screen.findByRole('menuitem', { name: /Sign Out/i })
+    expect(signOutButton).toBeInTheDocument()
   })
 
   it('should conditionally show navigation items based on permissions', async () => {
