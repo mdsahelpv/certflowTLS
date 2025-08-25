@@ -7,12 +7,16 @@ An enterprise-grade subordinate CA manager to issue, renew, revoke, and export c
 ### Core Features
 - **CA lifecycle**: Initialize CA, generate CSR, upload signed CA certificate, track validity and status
 - **Certificates**: Issue, renew, revoke; export (PEM/DER/PKCS#12); SANs; algorithms (RSA/ECDSA/Ed25519)
+- **Certificate Validation**: Comprehensive validation with chain verification, OCSP checking, and extension validation
 - **CRLs**: Generate, validate, download full and delta CRLs with numbering and extensions
+- **OCSP Responder**: Real-time certificate status checking with RSA-signed responses
 - **Audit**: Detailed audit trail for security and compliance
 - **RBAC**: Roles (Admin/Operator/Viewer) gate all actions
 - **Security**: AES-256 at-rest encryption, bcrypt, strict headers, rate limits, CSP
 - **Notifications**: Email/webhook settings and delivery history (expiry, CRL updates, alerts)
 - **Real-time**: Socket.IO at `/api/socketio` for live updates
+- **Multi-CA Support**: Manage multiple certificate authorities
+- **Logging**: Structured logging with file rotation and service-specific loggers
 
 ### Tech Stack
 - **Frontend**: Next.js App Router, React 19, Tailwind 4, shadcn/ui
@@ -41,6 +45,15 @@ npm run dev
 # App: http://localhost:3000
 ```
 
+### **Development with Debug Mode**
+```bash
+# Start with debug logging
+npm run dev:debug
+
+# Start custom server with Socket.IO
+npm run dev:custom
+```
+
 ### **Production Environment** (Docker + PostgreSQL)
 ```bash
 # 1. Setup environment (PostgreSQL)
@@ -51,6 +64,22 @@ docker compose up --build
 
 # 3. Access application
 # App: http://localhost:3000
+```
+
+### **Docker Commands**
+```bash
+# Build and run with Docker Compose
+npm run docker:compose
+
+# View logs
+npm run docker:compose:logs
+
+# Stop containers
+npm run docker:compose:down
+
+# Build standalone image
+npm run docker:build
+npm run docker:run
 ```
 
 ## 📋 Environment Configuration
@@ -127,9 +156,11 @@ npm run dev
 ```bash
 npm run dev              # Next.js dev server (port 3000)
 npm run dev:custom       # Custom server with Socket.IO (port 3000)
+npm run dev:debug        # Debug mode with verbose logging
 npm run build           # Production build
 npm run start           # Production custom server (port 3000)
 npm run start:next      # Production standard server (port 3000)
+npm run start:debug     # Production debug mode
 ```
 
 ### **Database Scripts**
@@ -138,14 +169,40 @@ npm run db:push:sqlite      # Push schema to SQLite
 npm run db:push:postgresql  # Push schema to PostgreSQL
 npm run db:studio:sqlite    # Open Prisma Studio (SQLite)
 npm run db:studio:postgresql # Open Prisma Studio (PostgreSQL)
+npm run db:generate         # Generate Prisma client
+npm run db:migrate          # Run database migrations
+npm run db:reset            # Reset database
 ```
 
 ### **Testing Scripts**
 ```bash
 npm test                 # Run tests
+npm run test:watch       # Run tests in watch mode
 npm run test:coverage    # Run tests with coverage
-npm run lint            # Run ESLint
-npm run format          # Format code
+npm run test:ci          # Run tests for CI
+npm run test:debug       # Debug tests
+npm run test:update      # Update test snapshots
+npm run test:verbose     # Verbose test output
+```
+
+### **Docker Scripts**
+```bash
+npm run docker:build         # Build Docker image
+npm run docker:run           # Run standalone container
+npm run docker:compose       # Start with Docker Compose
+npm run docker:compose:down  # Stop containers
+npm run docker:compose:logs  # View container logs
+```
+
+### **Utility Scripts**
+```bash
+npm run lint              # Run ESLint
+npm run lint:fix          # Auto-fix linting issues
+npm run clean             # Clean build cache
+npm run clean:all         # Clean all temporary files
+npm run setup             # Setup SQLite environment
+npm run setup:postgresql  # Setup PostgreSQL environment
+npm run setup:sqlite      # Setup SQLite environment
 ```
 
 ## 🐳 Docker Deployment
@@ -278,23 +335,46 @@ docker compose exec postgres psql -U postgres -d ca_management -c "SELECT 1;"
 src/
 ├── app/                    # Next.js App Router pages
 │   ├── api/               # API routes
+│   │   ├── auth/          # Authentication endpoints
+│   │   ├── ca/            # CA management endpoints
+│   │   ├── certificates/  # Certificate operations
+│   │   ├── crl/           # CRL management
+│   │   ├── ocsp/          # OCSP responder
+│   │   ├── audit/         # Audit logging
+│   │   ├── users/         # User management
+│   │   ├── notifications/ # Notification system
+│   │   ├── profile/       # User profile
+│   │   └── health/        # Health checks
 │   ├── auth/              # Authentication pages
 │   ├── ca/                # CA management pages
 │   ├── certificates/      # Certificate management pages
 │   ├── crl/               # CRL management pages
 │   ├── audit/             # Audit log pages
 │   ├── users/             # User management pages
+│   ├── notifications/     # Notification pages
+│   ├── profile/           # User profile pages
+│   ├── dashboard/         # Dashboard pages
 │   └── layout.tsx         # Root layout
 ├── components/            # React components
 │   ├── ui/                # shadcn/ui components
-│   └── layout.tsx         # Layout component
+│   ├── layout.tsx         # Layout component
+│   └── providers.tsx      # Context providers
 ├── lib/                   # Utility libraries
 │   ├── auth.ts            # Authentication configuration
 │   ├── ca.ts              # CA management logic
 │   ├── crypto.ts          # Cryptographic utilities
-│   ├── db.ts              # Database client
+│   ├── certificate-validation.ts # Certificate validation logic
+│   ├── ocsp.ts            # OCSP responder implementation
+│   ├── export.ts          # Certificate export utilities
+│   ├── notifications.ts   # Notification system
+│   ├── logger.ts          # Structured logging
+│   ├── log-rotation.ts    # Log rotation utilities
+│   ├── init.ts            # System initialization
 │   ├── security.ts        # Security middleware
-│   └── audit.ts           # Audit logging
+│   ├── audit.ts           # Audit logging
+│   ├── socket.ts          # Socket.IO setup
+│   ├── utils.ts           # General utilities
+│   └── db.ts              # Database client
 ├── hooks/                 # Custom React hooks
 ├── middleware.ts          # Request middleware
 └── middleware-security.ts # Security middleware
@@ -304,14 +384,31 @@ src/
 
 ### **Documentation**
 - `DOCKER_TROUBLESHOOTING.md` - Comprehensive Docker deployment guide
+- `LOGGING.md` - Logging configuration and troubleshooting
 - `test/README.md` - Testing framework documentation
+- `test/INSTALL.md` - Test setup instructions
 
 ### **Configuration Files**
 - `docker-compose.yml` - Standard Docker deployment
 - `docker-compose.simple.yml` - Simple Docker deployment (recommended)
+- `docker-compose.debug.yml` - Debug Docker deployment
 - `Dockerfile` - Docker image configuration
 - `jest.config.js` - Test configuration
 - `tsconfig.json` - TypeScript configuration
+- `tailwind.config.ts` - Tailwind CSS configuration
+- `eslint.config.mjs` - ESLint configuration
+
+### **Environment Templates**
+- `env.sqlite` - SQLite development environment
+- `env.docker` - Docker production environment
+- `env.postgresql` - PostgreSQL environment
+- `env.example` - Environment variables template
+
+### **Scripts and Utilities**
+- `setup.sh` - Automated setup script
+- `docker-troubleshoot.sh` - Docker troubleshooting script
+- `create-admin.js` - Admin user creation script
+- `init-system.js` - System initialization script
 
 ## 🤝 Contributing
 1. Fork the repository

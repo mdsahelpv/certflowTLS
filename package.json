@@ -5,10 +5,13 @@
   "scripts": {
     "dev": "PORT=3000 next dev",
     "dev:custom": "PORT=3000 nodemon --exec \"npx tsx server.ts\" --watch server.ts --watch src --ext ts,tsx,js,jsx 2>&1 | tee dev.log",
+    "dev:debug": "PORT=3000 NODE_ENV=development DEBUG=* nodemon --exec \"npx tsx server.ts\" --watch server.ts --watch src --ext ts,tsx,js,jsx",
     "build": "next build",
     "start": "PORT=3000 NODE_ENV=production tsx server.ts 2>&1 | tee server.log",
     "start:next": "PORT=3000 NODE_ENV=production next start",
+    "start:debug": "PORT=3000 NODE_ENV=production DEBUG=* tsx server.ts",
     "lint": "next lint",
+    "lint:fix": "next lint --fix",
     "setup": "node -e \"const fs = require('fs'); const path = require('path'); if (!fs.existsSync('.env')) { fs.copyFileSync('env.sqlite', '.env'); console.log('SQLite environment file created!'); } else { console.log('Environment file already exists'); } if (!fs.existsSync('db')) { fs.mkdirSync('db'); console.log('Database directory created!'); } console.log('Setup complete! Please edit .env file and run: npm run db:push');",
     "setup:postgresql": "node -e \"const fs = require('fs'); if (!fs.existsSync('.env')) { fs.copyFileSync('env.postgresql', '.env'); console.log('PostgreSQL environment file created!'); } else { console.log('Environment file already exists'); } console.log('PostgreSQL setup complete! Please edit .env file and run: npm run db:push:postgresql');",
     "setup:sqlite": "node -e \"const fs = require('fs'); if (!fs.existsSync('.env')) { fs.copyFileSync('env.sqlite', '.env'); console.log('SQLite environment file created!'); } else { console.log('Environment file already exists'); } if (!fs.existsSync('db')) { fs.mkdirSync('db'); console.log('Database directory created!'); } console.log('SQLite setup complete! Please edit .env file and run: npm run db:push:sqlite');",
@@ -26,7 +29,15 @@
     "test:coverage": "jest --coverage",
     "test:ci": "jest --ci --coverage --watchAll=false",
     "test:debug": "node --inspect-brk node_modules/.bin/jest --runInBand",
-    "test:update": "jest --updateSnapshot"
+    "test:update": "jest --updateSnapshot",
+    "test:verbose": "jest --verbose",
+    "docker:build": "docker build -t ca-management .",
+    "docker:run": "docker run -p 3000:3000 --env-file env.docker ca-management",
+    "docker:compose": "docker compose up --build",
+    "docker:compose:down": "docker compose down",
+    "docker:compose:logs": "docker compose logs -f",
+    "clean": "rm -rf .next node_modules/.cache",
+    "clean:all": "rm -rf .next node_modules/.cache db/*.db logs/*.log"
   },
   "prisma": {
     "schema": "prisma/schema.prisma"
@@ -122,6 +133,7 @@
     "eslint-config-next": "15.3.5",
     "jest": "^30.0.5",
     "jest-environment-jsdom": "^30.0.5",
+    "next": "15.3.5",
     "nodemon": "^3.1.10",
     "tailwindcss": "^4",
     "ts-jest": "^29.4.1",
