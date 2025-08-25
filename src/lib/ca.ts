@@ -197,7 +197,10 @@ export class CAService {
         // CA-specific basic constraints only; advanced policy/name constraints omitted for compatibility
         ...(data.certificateType === 'CA' && {
           pathLenConstraint: parseInt(process.env.CA_PATH_LENGTH_CONSTRAINT || '0')
-        })
+        }),
+        
+        // Certificate Policies for enterprise compliance
+        certificatePolicies: this.getDefaultCertificatePolicies()
       }
     );
 
