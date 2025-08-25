@@ -1,9 +1,8 @@
 import { Encryption, CertificateUtils, CSRUtils, CRLUtils, X509Utils } from '@/lib/crypto'
 import forge from 'node-forge'
 
-// Mock node-forge
-jest.mock('node-forge')
-const mockedForge = forge as jest.Mocked<typeof forge>
+// We will not mock node-forge for these tests, as they are integration tests for the crypto logic.
+// const mockedForge = forge as jest.Mocked<typeof forge>
 
 describe('Encryption', () => {
   const originalKey = process.env.ENCRYPTION_KEY
@@ -40,6 +39,9 @@ describe('Encryption', () => {
       expect(result).toHaveProperty('iv')
       expect(result).toHaveProperty('tag')
       expect(mockCreateCipheriv).toHaveBeenCalledWith('aes-256-gcm', expect.any(Buffer), expect.any(Buffer))
+
+      // Restore the mock
+      mockRandomBytes.mockRestore()
     })
 
     it('should throw error in production without encryption key', () => {
@@ -61,8 +63,8 @@ describe('Encryption', () => {
   describe('decrypt', () => {
     it('should decrypt encrypted text', () => {
       const encrypted = 'encrypted-data'
-      const iv = '1234567890123456'
-      const tag = 'auth-tag-data'
+      const iv = '0123456789abcdef0123456789abcdef'
+      const tag = '0123456789abcdef0123456789abcdef'
       
       // Mock createDecipheriv
       const mockDecipher = {

@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from '../utils/test-utils'
 import Layout from '@/components/layout'
 import { useAuth } from '@/hooks/useAuth'
+import { usePathname } from 'next/navigation'
 
 // Mock the useAuth hook
 jest.mock('@/hooks/useAuth')
@@ -153,8 +154,7 @@ describe('Layout Component', () => {
 
   it('should handle auth routes without layout chrome', () => {
     // Mock usePathname to return auth route
-    const mockUsePathname = require('next/navigation').usePathname
-    mockUsePathname.mockReturnValue('/auth/signin')
+    ;(usePathname as jest.Mock).mockReturnValue('/auth/signin')
 
     mockUseAuth.mockReturnValue({
       session: null,
