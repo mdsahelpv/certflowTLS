@@ -311,12 +311,13 @@ export class CAService {
   }
 
   static async generateCRL(caId?: string): Promise<string> {
-    const caConfig = caId
-      ? await db.cAConfig.findUnique({ where: { id: caId } })
-      : await db.cAConfig.findFirst();
-    if (!caConfig || caConfig.status !== CAStatus.ACTIVE) {
-      throw new Error('CA is not active');
-    }
+    try {
+      const caConfig = caId
+        ? await db.cAConfig.findUnique({ where: { id: caId } })
+        : await db.cAConfig.findFirst();
+      if (!caConfig || caConfig.status !== CAStatus.ACTIVE) {
+        throw new Error('CA is not active');
+      }
 
     // Get revoked certificates for this CA
     const revocations = await db.certificateRevocation.findMany({
@@ -398,7 +399,15 @@ export class CAService {
       },
     });
 
-    return crl;
+      return crl;
+    } catch (error) {
+      logger.error('CRL generation failed', {
+        error: error instanceof Error ? error.message : String(error),
+        caId,
+        stack: error instanceof Error ? error.stack : undefined
+      });
+      throw error; // Re-throw to maintain the original behavior
+    }
   }
 
   // Generate Delta CRL for incremental updates
@@ -775,7 +784,13 @@ export class CAService {
   static startCRLScheduler(): void {
     const hours = parseInt(process.env.CRL_UPDATE_INTERVAL_HOURS || '24', 10);
     const intervalMs = Math.max(1, hours) * 60 * 60 * 1000;
-    logger.info('Starting CRL scheduler...');
+    const runOnStartup = process.env.CRL_RUN_ON_STARTUP !== 'false'; // Default to true unless explicitly disabled
+    
+    logger.info('Starting CRL scheduler...', {
+      intervalHours: hours,
+      runOnStartup,
+      intervalMs
+    });
 
     // Interval for subsequent runs
     setInterval(async () => {
@@ -789,17 +804,29 @@ export class CAService {
       }
     }, intervalMs);
 
-    // Run immediately on start, but handle errors gracefully
-    (async () => {
-      try {
-        await this.generateCRL();
-        logger.info('Initial CRL generation executed successfully.');
-      } catch (err) {
-        // It's okay if this fails on first start before CA is configured
-        logger.warn('Initial CRL generation failed (CA may not be active)', {
-          error: err instanceof Error ? err.message : String(err),
-        });
-      }
-    })();
+    // Only run immediately if enabled and CA is already configured and active
+    // This prevents startup failures when CA is not yet set up
+    if (runOnStartup) {
+      setTimeout(async () => {
+        try {
+          // Check if there's an active CA before attempting CRL generation
+          const caConfig = await db.cAConfig.findFirst({ where: { status: 'ACTIVE' } });
+          if (!caConfig) {
+            logger.info('No active CA found, skipping initial CRL generation');
+            return;
+          }
+          
+          await this.generateCRL();
+          logger.info('Initial CRL generation executed successfully.');
+        } catch (err) {
+          // It's okay if this fails on first start before CA is configured
+          logger.warn('Initial CRL generation failed (CA may not be active)', {
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }, 5000); // Wait 5 seconds for database and other services to be ready
+    } else {
+      logger.info('CRL initial generation disabled, will run on next scheduled interval');
+    }
   }
 }
