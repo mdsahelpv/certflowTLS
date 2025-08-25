@@ -63,6 +63,7 @@ jest.mock('@/lib/db', () => ({
       create: jest.fn(),
       update: jest.fn(),
       delete: jest.fn(),
+      findFirst: jest.fn(),
     },
     certificate: {
       findUnique: jest.fn(),
@@ -70,6 +71,7 @@ jest.mock('@/lib/db', () => ({
       create: jest.fn(),
       update: jest.fn(),
       delete: jest.fn(),
+      findFirst: jest.fn(),
     },
     certificateRevocation: {
       findUnique: jest.fn(),
