@@ -74,6 +74,13 @@ describe('Certificate Validation - Complete Integration Flow', () => {
       expect(screen.getByRole('button', { name: 'Validate Certificate' })).toBeInTheDocument()
 
       // Step 2: Configure advanced validation options
+      const advancedOptionsButton = screen.getByRole('button', { name: /Advanced Validation Options/i })
+      fireEvent.click(advancedOptionsButton)
+
+      await waitFor(() => {
+        expect(screen.getByLabelText('Require Trusted Root')).toBeInTheDocument()
+      })
+
       const requireTrustedRoot = screen.getByLabelText('Require Trusted Root')
       const validateExtensions = screen.getByLabelText('Validate Extensions')
       const checkKeyUsage = screen.getByLabelText('Check Key Usage')
@@ -84,18 +91,20 @@ describe('Certificate Validation - Complete Integration Flow', () => {
       fireEvent.click(checkKeyUsage)
       fireEvent.click(checkBasicConstraints)
 
-      expect(requireTrustedRoot).toBeChecked()
-      expect(validateExtensions).toBeChecked()
-      expect(checkKeyUsage).toBeChecked()
-      expect(checkBasicConstraints).toBeChecked()
+      await waitFor(() => {
+        expect(requireTrustedRoot).toBeChecked()
+        expect(validateExtensions).toBeChecked()
+        expect(checkKeyUsage).toBeChecked()
+        expect(checkBasicConstraints).toBeChecked()
+      })
 
       // Step 3: Upload certificate file
       const file = new File(['-----BEGIN CERTIFICATE-----\nMOCK\n-----END CERTIFICATE-----'], 'test.pem', {
         type: 'application/x-pem-file'
       })
 
-      const fileInput = screen.getByTestId('certificate-file-input')
-      fireEvent.change(fileInput, { target: { files: [file] } })
+      const certificateTextarea = screen.getByLabelText('Certificate PEM')
+      fireEvent.change(certificateTextarea, { target: { value: '-----BEGIN CERTIFICATE-----\nINVALID\n-----END CERTIFICATE-----' } })
 
       await waitFor(() => {
         expect(screen.getByText('test.pem')).toBeInTheDocument()
@@ -195,6 +204,13 @@ describe('Certificate Validation - Complete Integration Flow', () => {
       render(<CertificateValidationPage />);
 
       // Configure validation options
+      const advancedOptionsButton = screen.getByRole('button', { name: /Advanced Validation Options/i })
+      fireEvent.click(advancedOptionsButton)
+
+      await waitFor(() => {
+        expect(screen.getByLabelText('Require Trusted Root')).toBeInTheDocument()
+      })
+
       const requireTrustedRoot = screen.getByLabelText('Require Trusted Root')
       fireEvent.click(requireTrustedRoot)
 

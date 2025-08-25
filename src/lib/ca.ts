@@ -4,6 +4,7 @@ import { Encryption, CertificateUtils, CSRUtils, CRLUtils, X509Utils } from './c
 import { AuditService } from './audit';
 import forge from 'node-forge';
 import { publishCRLToEndpoints } from './notifications';
+import { logger } from './logger';
 
 export interface CAConfigData {
   name?: string;
@@ -774,12 +775,31 @@ export class CAService {
   static startCRLScheduler(): void {
     const hours = parseInt(process.env.CRL_UPDATE_INTERVAL_HOURS || '24', 10);
     const intervalMs = Math.max(1, hours) * 60 * 60 * 1000;
+    logger.info('Starting CRL scheduler...');
+
+    // Interval for subsequent runs
     setInterval(async () => {
       try {
         await this.generateCRL();
+        logger.info('CRL generation scheduler executed successfully.');
       } catch (err) {
-        console.error('CRL scheduler run failed:', err);
+        logger.error('CRL scheduler run failed:', {
+          error: err instanceof Error ? err.message : String(err),
+        });
       }
     }, intervalMs);
+
+    // Run immediately on start, but handle errors gracefully
+    (async () => {
+      try {
+        await this.generateCRL();
+        logger.info('Initial CRL generation executed successfully.');
+      } catch (err) {
+        // It's okay if this fails on first start before CA is configured
+        logger.warn('Initial CRL generation failed (CA may not be active)', {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    })();
   }
 }
