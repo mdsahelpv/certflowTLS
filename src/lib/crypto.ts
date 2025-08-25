@@ -986,9 +986,18 @@ export class X509Utils {
 
     // 6. Subject Alternative Names (Non-critical)
     if (sans && sans.length > 0) {
+      const isIPv4 = (s: string) => /^(25[0-5]|2[0-4]\d|1?\d?\d)(\.(25[0-5]|2[0-4]\d|1?\d?\d)){3}$/.test(s);
+      const isIPv6 = (s: string) => /^[0-9a-fA-F:]+$/.test(s) && s.includes(':');
+      const altNames = sans.map((s) => {
+        const value = s.trim();
+        if (isIPv4(value) || isIPv6(value)) {
+          return { type: 7, ip: value } as any; // IP address
+        }
+        return { type: 2, value } as any; // DNS name (supports wildcard like *.example.com)
+      });
       extensions.push({ 
         name: 'subjectAltName', 
-        altNames: sans.map((s) => ({ type: 2, value: s })),
+        altNames,
         critical: false
       });
     }
