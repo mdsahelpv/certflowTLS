@@ -234,8 +234,15 @@ model NotificationSetting {
   recipient    String            // Email address or webhook URL
   enabled      Boolean           @default(true)
   daysBefore   Int               @default(30) // For expiry notifications
+  
+  // Webhook-specific configuration
+  webhookConfig String?          // JSON string for { timeout, retries, retryDelay, headers, secret }
+  
   createdAt    DateTime          @default(now())
   updatedAt    DateTime          @updatedAt
+
+  // Relations
+  webhookDeliveries WebhookDelivery[]
 
   @@map("notification_settings")
 }
@@ -253,6 +260,29 @@ model NotificationHistory {
   createdAt    DateTime          @default(now())
 
   @@map("notification_history")
+}
+
+// Webhook Delivery Tracking
+model WebhookDelivery {
+  id           String            @id @default(cuid())
+  webhookId    String            // Reference to notification setting
+  url          String
+  event        NotificationEvent
+  payload      String            // JSON string of full webhook payload
+  status       String            // pending, sent, failed, retrying
+  statusCode   Int?
+  responseTime Int?              // Response time in milliseconds
+  error        String?
+  retries      Int               @default(0)
+  maxRetries   Int               @default(3)
+  createdAt    DateTime          @default(now())
+  sentAt       DateTime?
+  nextRetryAt  DateTime?
+
+  // Relations
+  notificationSetting NotificationSetting @relation(fields: [webhookId], references: [id])
+
+  @@map("webhook_deliveries")
 }
 
 // System Configuration

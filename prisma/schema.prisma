@@ -241,6 +241,9 @@ model NotificationSetting {
   createdAt    DateTime          @default(now())
   updatedAt    DateTime          @updatedAt
 
+  // Relations
+  webhookDeliveries WebhookDelivery[]
+
   @@map("notification_settings")
 }
 
