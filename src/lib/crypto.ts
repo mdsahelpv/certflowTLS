@@ -1,5 +1,4 @@
-import crypto from 'crypto';
-import { createCipheriv, createDecipheriv, randomBytes, generateKeyPairSync } from 'crypto';
+import * as crypto from 'crypto';
 import type { CipherGCM, DecipherGCM, CipherGCMTypes } from 'crypto';
 import forge from 'node-forge';
 
@@ -23,8 +22,8 @@ export class Encryption {
   }
 
   static encrypt(text: string): { encrypted: string; iv: string; tag: string } {
-    const iv = randomBytes(16);
-    const cipher = createCipheriv(this.algorithm as CipherGCMTypes, this.getKey(), iv) as unknown as CipherGCM;
+    const iv = crypto.randomBytes(16);
+    const cipher = crypto.createCipheriv(this.algorithm as CipherGCMTypes, this.getKey(), iv) as unknown as CipherGCM;
     
     let encrypted = cipher.update(text, 'utf8', 'hex');
     encrypted += cipher.final('hex');
@@ -39,7 +38,7 @@ export class Encryption {
   }
 
   static decrypt(encrypted: string, iv: string, tag: string): string {
-    const decipher = createDecipheriv(
+    const decipher = crypto.createDecipheriv(
       this.algorithm as CipherGCMTypes,
       this.getKey(),
       Buffer.from(iv, 'hex')
@@ -100,7 +99,7 @@ export class CSRUtils {
     curve?: string
   ): { privateKey: string; publicKey: string } {
     if (algorithm === 'RSA') {
-      const pair = generateKeyPairSync('rsa', {
+      const pair = crypto.generateKeyPairSync('rsa', {
         modulusLength: keySize || 2048,
         publicKeyEncoding: { type: 'spki', format: 'pem' },
         privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
@@ -116,7 +115,7 @@ export class CSRUtils {
         'P-521': 'secp521r1',
       };
       const mappedCurve = curveMap[inputCurve] || inputCurve;
-      const pair = generateKeyPairSync('ec', {
+      const pair = crypto.generateKeyPairSync('ec', {
         namedCurve: mappedCurve, // e.g., 'P-256', 'P-384', 'P-521'
         publicKeyEncoding: { type: 'spki', format: 'pem' },
         privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
@@ -125,7 +124,7 @@ export class CSRUtils {
     }
 
     if (algorithm === 'Ed25519') {
-      const pair = generateKeyPairSync('ed25519', {
+      const pair = crypto.generateKeyPairSync('ed25519', {
         publicKeyEncoding: { type: 'spki', format: 'pem' },
         privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
       });

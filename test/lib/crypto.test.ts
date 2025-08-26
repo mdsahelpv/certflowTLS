@@ -1,45 +1,65 @@
 import { Encryption, CertificateUtils, CSRUtils, CRLUtils, X509Utils } from '@/lib/crypto'
 import forge from 'node-forge'
+import * as crypto from 'crypto'
 
-// Mock node-forge
-jest.mock('node-forge')
-const mockedForge = forge as jest.Mocked<typeof forge>
+jest.mock('node-forge', () => jest.requireActual('node-forge'))
+
+jest.mock('crypto', () => {
+  const actualCrypto = jest.requireActual('crypto');
+  let counter = 0;
+  return {
+    ...actualCrypto,
+    randomBytes: jest.fn().mockImplementation((size) => {
+      counter++;
+      // Create a buffer that is deterministic but different for each call
+      const buffer = Buffer.alloc(size);
+      buffer.fill(String(counter));
+      return buffer;
+    }),
+    createCipheriv: jest.fn((...args) => {
+      // @ts-ignore
+      const cipher = new actualCrypto.createCipheriv(...args);
+      const update = jest.spyOn(cipher, 'update');
+      const final = jest.spyOn(cipher, 'final');
+      const getAuthTag = jest.spyOn(cipher, 'getAuthTag');
+      return cipher;
+    }),
+    createDecipheriv: jest.fn((...args) => {
+      // @ts-ignore
+      const decipher = new actualCrypto.createDecipheriv(...args);
+      const setAuthTag = jest.spyOn(decipher, 'setAuthTag');
+      const update = jest.spyOn(decipher, 'update');
+      const final = jest.spyOn(decipher, 'final');
+      return decipher;
+    }),
+  };
+});
 
 describe('Encryption', () => {
   const originalKey = process.env.ENCRYPTION_KEY
-  
+
   beforeEach(() => {
     process.env.ENCRYPTION_KEY = 'test-32-character-encryption-key'
-    jest.clearAllMocks()
   })
 
   afterEach(() => {
     process.env.ENCRYPTION_KEY = originalKey
+    jest.restoreAllMocks()
   })
 
   describe('encrypt', () => {
     it('should encrypt text with AES-256-GCM', () => {
       const text = 'sensitive data'
-      
-      // Mock crypto.randomBytes
-      const mockRandomBytes = jest.spyOn(require('crypto'), 'randomBytes')
-      mockRandomBytes.mockReturnValue(Buffer.from('1234567890123456'))
-      
-      // Mock createCipheriv
-      const mockCipher = {
-        update: jest.fn().mockReturnValue(Buffer.from('encrypted')),
-        final: jest.fn().mockReturnValue(Buffer.from('final')),
-        getAuthTag: jest.fn().mockReturnValue(Buffer.from('auth-tag')),
-      }
-      const mockCreateCipheriv = jest.spyOn(require('crypto'), 'createCipheriv')
-      mockCreateCipheriv.mockReturnValue(mockCipher as any)
-      
       const result = Encryption.encrypt(text)
-      
+
       expect(result).toHaveProperty('encrypted')
       expect(result).toHaveProperty('iv')
       expect(result).toHaveProperty('tag')
-      expect(mockCreateCipheriv).toHaveBeenCalledWith('aes-256-gcm', expect.any(Buffer), expect.any(Buffer))
+      expect(crypto.createCipheriv).toHaveBeenCalledWith(
+        'aes-256-gcm',
+        expect.any(Buffer),
+        expect.any(Buffer)
+      )
     })
 
     it('should throw error in production without encryption key', () => {
@@ -59,24 +79,13 @@ describe('Encryption', () => {
   })
 
   describe('decrypt', () => {
-    it('should decrypt encrypted text', () => {
-      const encrypted = 'encrypted-data'
-      const iv = '1234567890123456'
-      const tag = 'auth-tag-data'
+    it('should decrypt what it encrypts', () => {
+      const originalText = 'some very secret text'
+      const { encrypted, iv, tag } = Encryption.encrypt(originalText)
       
-      // Mock createDecipheriv
-      const mockDecipher = {
-        setAuthTag: jest.fn(),
-        update: jest.fn().mockReturnValue(Buffer.from('decrypted')),
-        final: jest.fn().mockReturnValue(Buffer.from('final')),
-      }
-      const mockCreateDecipheriv = jest.spyOn(require('crypto'), 'createDecipheriv')
-      mockCreateDecipheriv.mockReturnValue(mockDecipher as any)
+      const decryptedText = Encryption.decrypt(encrypted, iv, tag)
       
-      const result = Encryption.decrypt(encrypted, iv, tag)
-      
-      expect(mockDecipher.setAuthTag).toHaveBeenCalledWith(Buffer.from(tag, 'hex'))
-      expect(result).toBe('decryptedfinal')
+      expect(decryptedText).toBe(originalText)
     })
   })
 })
@@ -200,10 +209,7 @@ describe('CSRUtils', () => {
         CN: 'test.example.com',
       }
       
-      const keyPair = {
-        privateKey: '-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----',
-        publicKey: '-----BEGIN PUBLIC KEY-----\ntest\n-----END PUBLIC KEY-----',
-      }
+      const keyPair = CSRUtils.generateKeyPair('RSA', 2048)
       
       const csr = CSRUtils.generateCSR(subject, keyPair.privateKey, keyPair.publicKey)
       
@@ -216,17 +222,53 @@ describe('CSRUtils', () => {
 describe('CRLUtils', () => {
   describe('generateCRL', () => {
     it('should generate CRL with revoked certificates', () => {
-      const caPrivateKey = '-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----'
-      const caCertificate = '-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----'
+      const keys = forge.pki.rsa.generateKeyPair(2048)
+      const cert = forge.pki.createCertificate()
+      cert.publicKey = keys.publicKey
+      cert.serialNumber = '01'
+      cert.validity.notBefore = new Date()
+      cert.validity.notAfter = new Date()
+      cert.validity.notAfter.setFullYear(cert.validity.notBefore.getFullYear() + 1)
+      const attrs = [
+        { name: 'commonName', value: 'example.org' },
+        { name: 'countryName', value: 'US' },
+        { shortName: 'ST', value: 'Virginia' },
+        { name: 'localityName', value: 'Blacksburg' },
+        { name: 'organizationName', value: 'Test' },
+        { shortName: 'OU', value: 'Test' },
+      ]
+      cert.setSubject(attrs)
+      cert.setIssuer(attrs)
+      cert.setExtensions([
+        {
+          name: 'basicConstraints',
+          cA: true,
+        },
+      ])
+      cert.sign(keys.privateKey, forge.md.sha256.create())
+      const caCertificate = forge.pki.certificateToPem(cert)
+      const caPrivateKey = forge.pki.privateKeyToPem(keys.privateKey)
+
       const revokedCertificates = [
         {
           serialNumber: '123456789',
           revocationDate: new Date(),
-          revocationReason: 'KEY_COMPROMISE',
+          reason: 'KEY_COMPROMISE',
         },
       ]
-      
-      const crl = CRLUtils.generateCRL(caPrivateKey, caCertificate, revokedCertificates, 1)
+      const nextUpdate = new Date()
+      nextUpdate.setDate(nextUpdate.getDate() + 30)
+
+      const crl = CRLUtils.generateCRL(
+        revokedCertificates,
+        'CN=example.org,C=US,ST=Virginia,L=Blacksburg,O=Test,OU=Test',
+        caPrivateKey,
+        nextUpdate,
+        {
+          crlNumber: 1,
+          caCertificatePem: caCertificate,
+        }
+      )
       
       expect(crl).toContain('-----BEGIN X509 CRL-----')
       expect(crl).toContain('-----END X509 CRL-----')
@@ -235,20 +277,26 @@ describe('CRLUtils', () => {
 })
 
 describe('X509Utils', () => {
+  let certPem: string
+
+  beforeAll(() => {
+    const keys = forge.pki.rsa.generateKeyPair(2048)
+    const cert = forge.pki.createCertificate()
+    cert.publicKey = keys.publicKey
+    cert.serialNumber = '01'
+    cert.validity.notBefore = new Date()
+    cert.validity.notAfter = new Date()
+    cert.validity.notAfter.setFullYear(cert.validity.notBefore.getFullYear() + 1)
+    const attrs = [{ name: 'commonName', value: 'example.org' }]
+    cert.setSubject(attrs)
+    cert.setIssuer(attrs)
+    cert.sign(keys.privateKey, forge.md.sha256.create())
+    certPem = forge.pki.certificateToPem(cert)
+  })
+
   describe('parseCertificateDates', () => {
     it('should parse certificate validity dates', () => {
-      const certificate = `
------BEGIN CERTIFICATE-----
-MIIDXTCCAkWgAwIBAgIJAKoK/OvH8TqLMA0GCSqGSIb3DQEBCwUAMEUxCzAJBgNV
-BAYTAkFVMRMwEQYDVQQIDApTb21lLVN0YXRlMSEwHwYDVQQKDBhJbnRlcm5ldCBX
-aWRnaXRzIFB0eSBMdGQwHhcNMTkwMTAxMDAwMDAwWhcNMjAwMTAxMDAwMDAwWjBF
-MQswCQYDVQQGEwJBVTETMBEGA1UECAwKU29tZS1TdGF0ZTEhMB8GA1UECgwYSW50
-ZXJuZXQgV2lkZ2l0cyBQdHkgTHRkMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIB
-CgKCAQEA...
------END CERTIFICATE-----
-      `
-      
-      const result = X509Utils.parseCertificateDates(certificate)
+      const result = X509Utils.parseCertificateDates(certPem)
       
       expect(result).toHaveProperty('notBefore')
       expect(result).toHaveProperty('notAfter')
@@ -257,20 +305,9 @@ CgKCAQEA...
     })
   })
 
-  describe('validateCertificate', () => {
+  describe('validateCertificateChain', () => {
     it('should validate valid certificate', () => {
-      const certificate = `
------BEGIN CERTIFICATE-----
-MIIDXTCCAkWgAwIBAgIJAKoK/OvH8TqLMA0GCSqGSIb3DQEBCwUAMEUxCzAJBgNV
-BAYTAkFVMRMwEQYDVQQIDApTb21lLVN0YXRlMSEwHwYDVQQKDBhJbnRlcm5ldCBX
-aWRnaXRzIFB0eSBMdGQwHhcNMTkwMTAxMDAwMDAwWhcNMjAwMTAxMDAwMDAwWjBF
-MQswCQYDVQQGEwJBVTETMBEGA1UECAwKU29tZS1TdGF0ZTEhMB8GA1UECgwYSW50
-ZXJuZXQgV2lkZ2l0cyBQdHkgTHRkMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIB
-CgKCAQEA...
------END CERTIFICATE-----
-      `
-      
-      const result = X509Utils.validateCertificate(certificate)
+      const result = X509Utils.validateCertificateChain(certPem, [certPem])
       
       expect(result.isValid).toBe(true)
     })
@@ -278,10 +315,11 @@ CgKCAQEA...
     it('should detect invalid certificate format', () => {
       const invalidCertificate = 'invalid certificate content'
       
-      const result = X509Utils.validateCertificate(invalidCertificate)
+      const result = X509Utils.validateCertificateChain(invalidCertificate, [])
       
       expect(result.isValid).toBe(false)
-      expect(result.error).toBeDefined()
+      expect(result.issues).toBeDefined()
+      expect(result.issues.length).toBeGreaterThan(0)
     })
   })
 })

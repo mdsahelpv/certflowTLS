@@ -6,6 +6,14 @@ import { GET as GET_LATEST } from '@/app/api/crl/download/latest/route'
 import { GET as GET_PUBLIC_BY_NUMBER } from '@/app/api/crl/download/[crlNumber]/public/route'
 import { db } from '@/lib/db'
 
+jest.mock('@/lib/db', () => ({
+  db: {
+    cRL: {
+      findFirst: jest.fn(),
+    },
+  },
+}))
+
 describe('CRL public endpoints', () => {
   beforeEach(() => {
     ;(db.cRL.findFirst as jest.Mock).mockReset()

@@ -3,12 +3,31 @@
  */
 import { NextRequest } from 'next/server'
 import { GET } from '@/app/api/health/route'
+import { SystemInitializer } from '@/lib/init'
+
+jest.mock('@/lib/init', () => ({
+  SystemInitializer: {
+    healthCheck: jest.fn().mockResolvedValue({
+      status: 'healthy',
+      checks: {
+        database: true,
+        auth: true,
+        notifications: true,
+      },
+      timestamp: new Date().toISOString(),
+      uptime: 123,
+      version: '1.0.0-test',
+      environment: 'test',
+    }),
+  },
+}))
 
 describe('Health API Endpoint', () => {
   let mockRequest: NextRequest
 
   beforeEach(() => {
     mockRequest = new NextRequest('http://localhost:3000/api/health')
+    ;(SystemInitializer.healthCheck as jest.Mock).mockClear()
   })
 
   it('should return 200 status with health information', async () => {

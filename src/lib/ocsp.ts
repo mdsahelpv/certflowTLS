@@ -48,7 +48,7 @@ function getIssuerNameAndKeyHashes(issuerCertPem: string) {
 	const md1 = forge.md.sha1.create();
 	md1.update(issuerDer);
 	const issuerNameHash = md1.digest().getBytes();
-	const fp = forge.pki.getPublicKeyFingerprint(cert.publicKey, { md: forge.md.sha1.create(), type: 'SubjectPublicKey' as any });
+	const fp = forge.pki.getPublicKeyFingerprint(cert.publicKey, { md: forge.md.sha1.create(), type: 'SubjectPublicKeyInfo' });
 	const issuerKeyHash = fp.getBytes ? fp.getBytes() : fp as unknown as string;
 	return { issuerNameHash, issuerKeyHash };
 }

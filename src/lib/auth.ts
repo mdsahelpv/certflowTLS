@@ -17,7 +17,12 @@ export interface UserWithPermissions {
 
 export class AuthService {
   static async hashPassword(password: string): Promise<string> {
-    const rounds = parseInt(process.env.BCRYPT_ROUNDS || '12');
+    const roundsText = process.env.BCRYPT_ROUNDS || '12';
+    const rounds = parseInt(roundsText, 10);
+    if (isNaN(rounds)) {
+      // Fallback for safety, though the || '12' should prevent this.
+      return bcrypt.hash(password, 12);
+    }
     return bcrypt.hash(password, rounds);
   }
 
