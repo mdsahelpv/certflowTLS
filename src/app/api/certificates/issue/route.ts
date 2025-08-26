@@ -84,11 +84,21 @@ export async function POST(request: Request) {
     }
 
     if (Array.isArray(data.sans)) {
-      const isDns = (host: string) => /^(?=.{1,253}$)(?!-)[A-Za-z0-9-]{1,63}(?<!-)(\.(?!-)[A-Za-z0-9-]{1,63}(?<!-))*\.?$/.test(host);
+      const isDns = (host: string) => {
+        // Allow a single leading wildcard label
+        if (host.startsWith('*.')) {
+          const rest = host.slice(2);
+          return /^(?=.{1,253}$)(?!-)[A-Za-z0-9-]{1,63}(?<!-)(\.(?!-)[A-Za-z0-9-]{1,63}(?<!-))*\.?$/.test(rest);
+        }
+        return /^(?=.{1,253}$)(?!-)[A-Za-z0-9-]{1,63}(?<!-)(\.(?!-)[A-Za-z0-9-]{1,63}(?<!-))*\.?$/.test(host);
+      };
+      const isIPv4 = (s: string) => /^(25[0-5]|2[0-4]\d|1?\d?\d)(\.(25[0-5]|2[0-4]\d|1?\d?\d)){3}$/.test(s);
+      const isIPv6 = (s: string) => /^[0-9a-fA-F:]+$/.test(s) && s.includes(':');
       const isEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
       const invalid = data.sans.some((s: unknown) => {
         if (typeof s !== 'string' || s.length === 0 || s.length > 253) return true;
-        // Allow DNS for all, email for CLIENT certs
+        if (isIPv4(s) || isIPv6(s)) return false; // allow IP SANs
+        // Allow DNS (including wildcard), email for CLIENT certs
         if (data.certificateType === 'CLIENT') {
           return !(isDns(s) || isEmail(s));
         }
@@ -96,7 +106,7 @@ export async function POST(request: Request) {
       });
       if (invalid) {
         return NextResponse.json(
-          { error: data.certificateType === 'CLIENT' ? 'Each SAN must be a valid DNS name or email address' : 'Each SAN must be a valid DNS name' },
+          { error: data.certificateType === 'CLIENT' ? 'Each SAN must be a valid DNS name, IP, or email address' : 'Each SAN must be a valid DNS name or IP address' },
           { status: 400 }
         );
       }

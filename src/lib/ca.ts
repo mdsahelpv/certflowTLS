@@ -153,8 +153,9 @@ export class CAService {
           if (extReq && extReq.extensions) {
             const sanExt = extReq.extensions.find((e: any) => e.name === 'subjectAltName');
             if (sanExt && Array.isArray(sanExt.altNames)) {
+              // Accept DNS (type 2) and IP (type 7) entries from CSR
               data.sans = sanExt.altNames
-                .filter((n: any) => n && (n.type === 2 || n.type === 'DNS'))
+                .filter((n: any) => n && (n.type === 2 || n.type === 7 || n.type === 'DNS' || n.type === 'IP'))
                 .map((n: any) => n.value);
             }
           }
@@ -197,7 +198,10 @@ export class CAService {
         // CA-specific basic constraints only; advanced policy/name constraints omitted for compatibility
         ...(data.certificateType === 'CA' && {
           pathLenConstraint: parseInt(process.env.CA_PATH_LENGTH_CONSTRAINT || '0')
-        })
+        }),
+        
+        // Certificate Policies for enterprise compliance
+        certificatePolicies: this.getDefaultCertificatePolicies()
       }
     );
 

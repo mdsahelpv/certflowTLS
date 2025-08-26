@@ -986,21 +986,30 @@ export class X509Utils {
 
     // 6. Subject Alternative Names (Non-critical)
     if (sans && sans.length > 0) {
+      const isIPv4 = (s: string) => /^(25[0-5]|2[0-4]\d|1?\d?\d)(\.(25[0-5]|2[0-4]\d|1?\d?\d)){3}$/.test(s);
+      const isIPv6 = (s: string) => /^[0-9a-fA-F:]+$/.test(s) && s.includes(':');
+      const altNames = sans.map((s) => {
+        const value = s.trim();
+        if (isIPv4(value) || isIPv6(value)) {
+          return { type: 7, ip: value } as any; // IP address
+        }
+        return { type: 2, value } as any; // DNS name (supports wildcard like *.example.com)
+      });
       extensions.push({ 
         name: 'subjectAltName', 
-        altNames: sans.map((s) => ({ type: 2, value: s })),
+        altNames,
         critical: false
       });
     }
 
-    // 7. Certificate Policies (Non-critical) — disabled for compatibility
-    // if (opts?.certificatePolicies && opts.certificatePolicies.length > 0) {
-    //   const policyIdentifiers = opts.certificatePolicies.map(policyOid => ({
-    //     policyIdentifier: policyOid,
-    //     policyQualifiers: [] // Can be extended with policy qualifiers
-    //   }));
-    //   extensions.push({ name: 'certificatePolicies', value: policyIdentifiers, critical: false });
-    // }
+    // 7. Certificate Policies (Non-critical) - REQUIRED for enterprise PKI
+    if (opts?.certificatePolicies && opts.certificatePolicies.length > 0) {
+      const policyIdentifiers = opts.certificatePolicies.map(policyOid => ({
+        policyIdentifier: policyOid,
+        policyQualifiers: [] // Can be extended with policy qualifiers
+      }));
+      extensions.push({ name: 'certificatePolicies', value: policyIdentifiers, critical: false });
+    }
 
     // 8. Policy Constraints (CRITICAL for CA certificates) — disabled for compatibility
     // if (isCA && opts?.policyConstraints) {
@@ -1018,32 +1027,36 @@ export class X509Utils {
     //   extensions.push(nameConstraints);
     // }
 
-    // 10. CRL Distribution Points (Non-critical) — disabled for compatibility
-    // if (opts?.crlDistributionPointUrl) {
-    //   extensions.push({ 
-    //     name: 'cRLDistributionPoints', 
-    //     value: [{
-    //       distributionPoint: [{ type: 6, value: opts.crlDistributionPointUrl }],
-    //       reasons: undefined,
-    //       cRLIssuer: undefined
-    //     }],
-    //     critical: false
-    //   });
-    // }
+    // 10. CRL Distribution Points (Non-critical) - REQUIRED for enterprise PKI
+    if (opts?.crlDistributionPointUrl) {
+      extensions.push({ 
+        name: 'cRLDistributionPoints', 
+        value: [{
+          distributionPoint: [{ type: 6, value: opts.crlDistributionPointUrl }],
+          reasons: [1, 2, 3, 4, 5, 6, 8, 9, 10], // All revocation reasons
+          cRLIssuer: undefined
+        }],
+        critical: false
+      });
+    }
 
-    // 11. Authority Information Access (Non-critical) — disabled for compatibility
-    // if (opts?.ocspUrl) {
-    //   extensions.push({
-    //     name: 'authorityInfoAccess',
-    //     accessDescriptions: [
-    //       {
-    //         accessMethod: forge.pki.oids.ocsp,
-    //         accessLocation: { type: 6, value: opts.ocspUrl },
-    //       },
-    //     ],
-    //     critical: false
-    //   });
-    // }
+    // 11. Authority Information Access (Non-critical) - REQUIRED for enterprise PKI
+    if (opts?.ocspUrl) {
+      extensions.push({
+        name: 'authorityInfoAccess',
+        accessDescriptions: [
+          {
+            accessMethod: '1.3.6.1.5.5.7.48.1', // OCSP
+            accessLocation: { type: 6, value: opts.ocspUrl },
+          },
+          {
+            accessMethod: '1.3.6.1.5.5.7.48.2', // CA Issuers
+            accessLocation: { type: 6, value: opts.ocspUrl.replace('/ocsp', '/ca') },
+          },
+        ],
+        critical: false
+      });
+    }
 
     cert.setExtensions(extensions);
 

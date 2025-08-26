@@ -189,15 +189,15 @@ export default function IssueCertificatePage() {
         setKeyAlgorithm(KeyAlgorithm.ECDSA);
       }
 
-      // Extract SANs if present
+      // Extract SANs if present (DNS and IP)
       let existingSans: string[] = [];
       const extReq = csr.getAttribute({ name: 'extensionRequest' });
       if (extReq && extReq.extensions) {
         const sanExt = extReq.extensions.find((e: any) => e.name === 'subjectAltName');
         if (sanExt && Array.isArray(sanExt.altNames)) {
           existingSans = sanExt.altNames
-            .filter((n: any) => n && (n.type === 2 || n.type === 'DNS'))
-            .map((n: any) => n.value);
+            .filter((n: any) => n && (n.type === 2 || n.type === 7 || n.type === 'DNS' || n.type === 'IP'))
+            .map((n: any) => (n.type === 7 || n.type === 'IP') ? (n.ip || n.value) : n.value);
         }
       }
       setCsrSans(existingSans);

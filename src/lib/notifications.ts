@@ -1,6 +1,7 @@
 import { db } from '@/lib/db';
 import { NotificationType, NotificationEvent, CertificateStatus } from '@prisma/client';
 import { AuditService } from './audit';
+import { WebhookService, WebhookConfig } from './webhook-service';
 
 export interface NotificationData {
   type: NotificationType;
@@ -8,6 +9,7 @@ export interface NotificationData {
   recipient: string;
   daysBefore?: number;
   enabled?: boolean;
+  webhookConfig?: WebhookConfig; // For webhook-specific settings
 }
 
 export interface NotificationPayload {
@@ -26,6 +28,7 @@ export class NotificationService {
         recipient: data.recipient,
         daysBefore: data.daysBefore || 30,
         enabled: data.enabled ?? true,
+        webhookConfig: data.webhookConfig ? JSON.stringify(data.webhookConfig) : null,
       },
     });
   }
@@ -37,9 +40,14 @@ export class NotificationService {
   }
 
   static async updateNotification(id: string, data: Partial<NotificationData>): Promise<void> {
+    const updateData: any = { ...data };
+    if (data.webhookConfig) {
+      updateData.webhookConfig = JSON.stringify(data.webhookConfig);
+    }
+    
     await db.notificationSetting.update({
       where: { id },
-      data,
+      data: updateData,
     });
   }
 
@@ -62,7 +70,7 @@ export class NotificationService {
         if (setting.type === NotificationType.EMAIL) {
           await this.sendEmail(setting.recipient, payload.subject, payload.message);
         } else if (setting.type === NotificationType.WEBHOOK) {
-          await this.sendWebhook(setting.recipient, payload);
+          await this.sendWebhookWithTracking(setting, payload);
         }
 
         // Log notification history
@@ -101,15 +109,9 @@ export class NotificationService {
     console.log(`Subject: ${subject}`);
     console.log(`Message: ${message}`);
     
-    // Mock email sending
-    if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
-      throw new Error('SMTP configuration not found');
-    }
-    
     // In production, implement actual email sending here
-    // Example using nodemailer:
     /*
-    const transporter = nodemailer.createTransport({
+    const transporter = nodemailer.createTransporter({
       host: process.env.SMTP_HOST,
       port: parseInt(process.env.SMTP_PORT || '587'),
       secure: false,
@@ -128,26 +130,62 @@ export class NotificationService {
     */
   }
 
-  private static async sendWebhook(url: string, payload: NotificationPayload): Promise<void> {
-    // This is a mock implementation - in production, use actual HTTP requests
-    console.log(`Sending webhook to ${url}:`);
-    console.log('Payload:', payload);
-    
-    // Mock webhook sending
-    if (!url.startsWith('http')) {
+  private static async sendWebhookWithTracking(setting: any, payload: NotificationPayload): Promise<void> {
+    // Parse webhook configuration
+    const webhookConfig: WebhookConfig = {
+      url: setting.recipient,
+      ...(setting.webhookConfig ? JSON.parse(setting.webhookConfig) : {})
+    };
+
+    // Validate webhook URL
+    if (!WebhookService.validateWebhookUrl(webhookConfig.url)) {
       throw new Error('Invalid webhook URL');
     }
-    
-    // In production, implement actual webhook sending here
-    /*
-    await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
+
+    // Create delivery tracking record
+    const delivery = await db.webhookDelivery.create({
+      data: {
+        webhookId: setting.id,
+        url: webhookConfig.url,
+        event: payload.event,
+        payload: payload,
+        status: 'pending',
+        maxRetries: webhookConfig.retries || 3,
       },
-      body: JSON.stringify(payload),
     });
-    */
+
+    try {
+      // Send webhook
+      const response = await WebhookService.sendWebhook(webhookConfig, payload);
+
+      // Update delivery record
+      await db.webhookDelivery.update({
+        where: { id: delivery.id },
+        data: {
+          status: response.success ? 'sent' : 'failed',
+          statusCode: response.statusCode,
+          responseTime: response.responseTime,
+          error: response.error,
+          retries: response.retries || 0,
+          sentAt: response.success ? new Date() : undefined,
+        },
+      });
+
+      if (!response.success) {
+        throw new Error(response.error || 'Webhook delivery failed');
+      }
+    } catch (error) {
+      // Update delivery record with error
+      await db.webhookDelivery.update({
+        where: { id: delivery.id },
+        data: {
+          status: 'failed',
+          error: error instanceof Error ? error.message : String(error),
+          retries: 0,
+        },
+      });
+      throw error;
+    }
   }
 
   static async checkCertificateExpiry(): Promise<void> {
