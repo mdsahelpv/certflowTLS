@@ -26,31 +26,44 @@ jest.mock('@/lib/audit', () => ({
   },
 }));
 
+import { Encryption } from '@/lib/crypto';
+import forge from 'node-forge';
+
+// Helper to create a valid self-signed CA for mocking
+const createMockCa = () => {
+  const caKeys = forge.pki.rsa.generateKeyPair(2048);
+  const caCert = forge.pki.createCertificate();
+  caCert.publicKey = caKeys.publicKey;
+  caCert.serialNumber = '01';
+  caCert.validity.notBefore = new Date();
+  caCert.validity.notAfter = new Date();
+  caCert.validity.notAfter.setFullYear(caCert.validity.notBefore.getFullYear() + 1);
+  const caAttrs = [{ name: 'commonName', value: 'Test CA' }];
+  caCert.setSubject(caAttrs);
+  caCert.setIssuer(caAttrs);
+  caCert.setExtensions([{ name: 'basicConstraints', cA: true, critical: true }]);
+  caCert.sign(caKeys.privateKey, forge.md.sha256.create());
+
+  const encryptedKey = Encryption.encrypt(forge.pki.privateKeyInfoToPem(caKeys.privateKey));
+
+  return {
+    id: 'test-ca-id',
+    subjectDN: 'CN=Test CA',
+    status: 'ACTIVE',
+    certificate: forge.pki.certificateToPem(caCert),
+    privateKey: JSON.stringify(encryptedKey),
+    crlDistributionPoint: 'https://test.example.com/api/crl/download/latest',
+    ocspUrl: 'https://test.example.com/api/ocsp',
+    crlNumber: 1,
+  };
+};
+
 describe('CRL Distribution Points in Certificates', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    
-    // Mock CA configuration
-    (db.cAConfig.findFirst as jest.Mock).mockResolvedValue({
-      id: 'test-ca-id',
-      subjectDN: 'CN=Test CA,O=Test Org,C=US',
-      status: 'ACTIVE',
-      certificate: `-----BEGIN CERTIFICATE-----
-MIIDXTCCAkWgAwIBAgIJAKoK8sZQpzFEMA0GCSqGSIb3DQEBCwUAMEUxCzAJBgNV
-BAYTAlVTMRMwEQYDVQQIDApTb21lLVN0YXRlMSEwHwYDVQQKDBhJbnRlcm5ldCBX
-aWRnaXRzIFB0eSBMdGQwHhcNMTkwMzI2MTIzNDU5WhcNMjAwMzI1MTIzNDU5WjBF
-MQswCQYDVQQGEwJVUzETMBEGA1UECAwKU29tZS1TdGF0ZTEhMB8GA1UECgwYSW50
-ZXJuZXQgV2lkZ2l0cyBQdHkgTHRkMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIB
-CgKCAQEA...`,
-      privateKey: JSON.stringify({
-        encrypted: 'encrypted-key-data',
-        iv: 'iv-data',
-        tag: 'tag-data'
-      }),
-      crlDistributionPoint: 'https://test.example.com/api/crl/download/latest',
-      ocspUrl: 'https://test.example.com/api/ocsp',
-      crlNumber: 1,
-    });
+    const mockCaConfig = createMockCa();
+    (db.cAConfig.findFirst as jest.Mock).mockResolvedValue(mockCaConfig);
+    (db.cAConfig.findUnique as jest.Mock).mockResolvedValue(mockCaConfig);
   });
 
   describe('Certificate Issuance with CRL Distribution Points', () => {
@@ -61,24 +74,22 @@ CgKCAQEA...`,
         serialNumber: '1234567890ABCDEF',
       });
 
-      // Mock CSR data
-      const csrData = `-----BEGIN CERTIFICATE REQUEST-----
-MIIDXTCCAkWgAwIBAgIJAKoK8sZQpzFEMA0GCSqGSIb3DQEBCwUAMEUxCzAJBgNV
-BAYTAlVTMRMwEQYDVQQIDApTb21lLVN0YXRlMSEwHwYDVQQKDBhJbnRlcm5ldCBX
-aWRnaXRzIFB0eSBMdGQwHhcNMTkwMzI2MTIzNDU5WhcNMjAwMzI1MTIzNDU5WjBF
-MQswCQYDVQQGEwJVUzETMBEGA1UECAwKU29tZS1TdGF0ZTEhMB8GA1UECgwYSW50
-ZXJuZXQgV2lkZ2l0cyBQdHkgTHRkMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIB
-CgKCAQEA...`;
+      // Generate a valid CSR for the test
+      const clientKeys = forge.pki.rsa.generateKeyPair(2048);
+      const csr = forge.pki.createCertificationRequest();
+      csr.publicKey = clientKeys.publicKey;
+      csr.setSubject([{ name: 'commonName', value: 'test.example.com' }]);
+      csr.sign(clientKeys.privateKey, forge.md.sha256.create());
+      const csrPem = forge.pki.certificationRequestToPem(csr);
 
       // Issue certificate
       const result = await CAService.issueCertificate({
-        subjectDN: 'CN=Test Certificate,O=Test Org,C=US',
+        subjectDN: 'CN=test.example.com',
         certificateType: 'SERVER',
         keyAlgorithm: 'RSA',
-        keySize: 2048,
         validityDays: 365,
         sans: ['test.example.com'],
-        csr: csrData,
+        csr: csrPem,
       }, 'test-user-id');
 
       // Verify certificate was created
@@ -110,15 +121,22 @@ CgKCAQEA...`;
         serialNumber: '1234567890ABCDEF',
       });
 
+      // Generate a valid CSR for the test
+      const clientKeys = forge.pki.rsa.generateKeyPair(2048);
+      const csr = forge.pki.createCertificationRequest();
+      csr.publicKey = clientKeys.publicKey;
+      csr.setSubject([{ name: 'commonName', value: 'test.example.com' }]);
+      csr.sign(clientKeys.privateKey, forge.md.sha256.create());
+      const csrPem = forge.pki.certificationRequestToPem(csr);
+
       // Issue certificate
       const result = await CAService.issueCertificate({
-        subjectDN: 'CN=Test Certificate,O=Test Org,C=US',
+        subjectDN: 'CN=test.example.com',
         certificateType: 'SERVER',
         keyAlgorithm: 'RSA',
-        keySize: 2048,
         validityDays: 365,
         sans: ['test.example.com'],
-        csr: 'test-csr-data',
+        csr: csrPem,
       }, 'test-user-id');
 
       // Verify certificate was created

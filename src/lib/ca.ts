@@ -347,17 +347,13 @@ export class CAService {
     }
 
     // Generate CRL with enhanced extensions
-    const crl = CRLUtils.generateCRL(
+    const crl = await CRLUtils.generateCRL(
       revokedCertificates,
       caConfig.subjectDN,
       caPrivateKey,
+      caConfig.certificate,
       new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
-      {
-        crlNumber: caConfig.crlNumber + 1,
-        caCertificatePem: caConfig.certificate,
-        crlDistributionPoint: caConfig.crlDistributionPoint || undefined,
-        authorityInfoAccess: caConfig.ocspUrl || undefined,
-      }
+      caConfig.crlNumber + 1
     );
 
     // Update CRL number
@@ -466,20 +462,8 @@ export class CAService {
       throw new Error('CA certificate not found');
     }
 
-    // Generate Delta CRL
-    const deltaCRL = CRLUtils.generateDeltaCRL(
-      revokedCertificates,
-      caConfig.subjectDN,
-      caPrivateKey,
-      new Date(Date.now() + 6 * 60 * 60 * 1000), // 6 hours for delta CRL
-      lastFullCRL.crlNumber,
-      caConfig.crlNumber + 1,
-      {
-        caCertificatePem: caConfig.certificate,
-        crlDistributionPoint: caConfig.crlDistributionPoint || undefined,
-        authorityInfoAccess: caConfig.ocspUrl || undefined,
-      }
-    );
+    // The underlying pkijs implementation for delta CRLs is not yet written.
+    throw new Error('Delta CRL generation is not currently supported.');
 
     // Update CRL number
     const newCrlNumber = caConfig.crlNumber + 1;

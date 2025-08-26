@@ -38,67 +38,60 @@ An enterprise-grade subordinate CA manager to issue, renew, revoke, and export c
 - **Auth**: NextAuth.js (credentials), sessions + JWT
 - **Tooling**: Jest, ESLint, TypeScript, Nodemon/tsx
 
-## 🚀 Quick Start
+## 🚀 Getting Started
 
-### **Development Environment** (SQLite + Next.js Dev Server)
+This guide provides a linear, step-by-step process for setting up a local development environment using SQLite.
+
+### **1. Clone the Repository**
 ```bash
-# 1. Clone repository
 git clone <your-repo-url>
 cd CER
+```
 
-# 2. Install dependencies
-npm install
-
-# 3. Setup environment (SQLite)
+### **2. Configure the Environment**
+Copy the SQLite environment template to a new `.env` file. This file is where all local configuration is stored.
+```bash
 cp env.sqlite .env
+```
+**Important**: Open the `.env` file and ensure the `DATABASE_URL` is set correctly. You should also change the default `NEXTAUTH_SECRET` and `ENCRYPTION_KEY` for security.
 
-# 4. Initialize database
-npm run db:push:sqlite
+### **3. Install Dependencies**
+```bash
+npm install
+```
 
-# 5. Start development server
+### **4. Set up the Database**
+This project supports multiple database backends. For a local SQLite setup, you must first copy the SQLite schema to make it the default for Prisma.
+```bash
+cp prisma/schema.sqlite prisma/schema.prisma
+```
+Now, run the database migration to create the necessary tables. This command reads your `.env` file.
+```bash
+npx prisma migrate dev --name init
+```
+
+### **5. Create an Admin User**
+Set your desired administrator credentials as environment variables and run the user creation script.
+```bash
+export ADMIN_USERNAME=admin
+export ADMIN_PASSWORD=your_secure_password
+node create-admin.js
+```
+*Note: You can unset these variables after the script runs with `unset ADMIN_USERNAME ADMIN_PASSWORD`.*
+
+### **6. Set up the Root Certificate Authority (CA)**
+Before you can issue certificates, you must create the initial root CA. A helper script is provided for this.
+```bash
+npx tsx init-ca.ts
+```
+This script will create a self-signed root CA and generate the first Certificate Revocation List (CRL). It only needs to be run once.
+
+### **7. Run the Application**
+You can now start the development server.
+```bash
 npm run dev
-
-# 6. Access application
-# App: http://localhost:3000
-# Default admin: admin / admin123
 ```
-
-### **Development with Debug Mode**
-```bash
-# Start with debug logging
-npm run dev:debug
-
-# Start custom server with Socket.IO
-npm run dev:custom
-```
-
-### **Production Environment** (Docker + PostgreSQL)
-```bash
-# 1. Setup environment (PostgreSQL)
-cp env.docker .env
-
-# 2. Start with Docker Compose
-docker compose up --build
-
-# 3. Access application
-# App: http://localhost:3000
-```
-
-### **Docker Commands**
-```bash
-# Build and run with Docker Compose
-npm run docker:compose
-
-# View logs
-npm run docker:compose:logs
-
-# Stop containers
-npm run docker:compose:down
-
-# Build standalone image
-npm run docker:build
-npm run docker:run
-```
+The application will be available at `http://localhost:3000`. You can log in with the admin credentials you created in step 5.
 
 ## 📋 Environment Configuration
 
