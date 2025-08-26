@@ -462,8 +462,16 @@ export class CAService {
       throw new Error('CA certificate not found');
     }
 
-    // The underlying pkijs implementation for delta CRLs is not yet written.
-    throw new Error('Delta CRL generation is not currently supported.');
+    // Generate Delta CRL
+    const deltaCRL = await CRLUtils.generateDeltaCRL(
+      revokedCertificates,
+      caConfig.subjectDN,
+      caPrivateKey,
+      caConfig.certificate,
+      new Date(Date.now() + 6 * 60 * 60 * 1000), // 6 hours for delta CRL
+      lastFullCRL.crlNumber,
+      caConfig.crlNumber + 1,
+    );
 
     // Update CRL number
     const newCrlNumber = caConfig.crlNumber + 1;

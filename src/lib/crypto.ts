@@ -241,7 +241,7 @@ export class CRLUtils {
     // Sign the CRL
     const privateKeyBuffer = Buffer.from(caPrivateKeyPem.replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|[\r\n]/g, ''), 'base64');
     const privateKey = await crypto.importKey("pkcs8", privateKeyBuffer, { name: "RSASSA-PKCS1-v1_5", hash: { name: "SHA-256" } }, true, ["sign"]);
-    
+
     await crl.sign(privateKey, "SHA-256");
 
     // Serialize to PEM
@@ -252,9 +252,74 @@ export class CRLUtils {
     return crlPem;
   }
 
-  // NOTE: The other CRLUtils functions (delta, validate, getInfo) are not implemented with pkijs yet.
-  // This is a placeholder to avoid breaking other parts of the application.
-  static generateDeltaCRL(): string { throw new Error("Not implemented"); }
+  static async generateDeltaCRL(
+    revokedCertificates: Array<{
+      serialNumber: string;
+      revocationDate: Date;
+      reason: string;
+    }>,
+    issuerDN: string,
+    caPrivateKeyPem: string,
+    caCertificatePem: string,
+    nextUpdate: Date,
+    baseCrlNumber: number,
+    deltaCrlNumber: number,
+  ): Promise<string> {
+    const crypto = pkijs.getCrypto(true);
+    const crl = new pkijs.CertificateRevocationList();
+
+    crl.version = 1;
+    crl.thisUpdate = new pkijs.Time({ value: new Date() });
+    crl.nextUpdate = new pkijs.Time({ value: nextUpdate });
+
+    const certBuffer = Buffer.from(caCertificatePem.replace(/-----BEGIN CERTIFICATE-----|-----END CERTIFICATE-----|[\r\n]/g, ''), 'base64');
+    const certAsn1 = asn1js.fromBER(certBuffer);
+    const caCert = new pkijs.Certificate({ schema: certAsn1.result });
+    crl.issuer = caCert.subject;
+    crl.revokedCertificates = [];
+    for (const rc of revokedCertificates) {
+      const revokedCertificate = new pkijs.RevokedCertificate({
+        userCertificate: new asn1js.Integer({ value: parseInt(rc.serialNumber, 16) }),
+        revocationDate: rc.revocationDate,
+      });
+      crl.revokedCertificates.push(revokedCertificate);
+    }
+
+    const extensions = [];
+    // Base CRL Number (critical for delta CRLs)
+    extensions.push(new pkijs.Extension({
+        extnID: "2.5.29.20", // cRLNumber
+        critical: false,
+        extnValue: new asn1js.Integer({ value: baseCrlNumber }).toBER(false),
+    }));
+    // Delta CRL Indicator (critical)
+    extensions.push(new pkijs.Extension({
+        extnID: "2.5.29.27", // deltaCRLIndicator
+        critical: true,
+        extnValue: new asn1js.Integer({ value: deltaCrlNumber }).toBER(false),
+    }));
+
+    const authorityKeyIdentifier = await crypto.exportKey("spki", await caCert.getPublicKey());
+    const authorityKeyIdentifierHashed = await crypto.digest({ name: "SHA-1" }, authorityKeyIdentifier);
+    extensions.push(new pkijs.Extension({
+        extnID: "2.5.29.35", // authorityKeyIdentifier
+        critical: false,
+        extnValue: new pkijs.AuthorityKeyIdentifier({ keyIdentifier: new asn1js.OctetString({ valueHex: authorityKeyIdentifierHashed }) }).toSchema().toBER(false),
+    }));
+
+    crl.extensions = new pkijs.Extensions({ extensions });
+
+    const privateKeyBuffer = Buffer.from(caPrivateKeyPem.replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|[\r\n]/g, ''), 'base64');
+    const privateKey = await crypto.importKey("pkcs8", privateKeyBuffer, { name: "RSASSA-PKCS1-v1_5", hash: { name: "SHA-256" } }, true, ["sign"]);
+
+    await crl.sign(privateKey, "SHA-256");
+
+    const crlSchema = crl.toSchema();
+    const crlDer = crlSchema.toBER(false);
+    return `-----BEGIN X509 CRL-----\n${Buffer.from(crlDer).toString('base64')}\n-----END X509 CRL-----`;
+  }
+
+  // NOTE: The other CRLUtils functions (validate, getInfo) are not implemented with pkijs yet.
   static validateCRLExtensions(crlPem: string): { isValid: boolean; issues: string[] } { return { isValid: true, issues: [] }; }
   static getCRLInfo(crlPem: string): any { return {}; }
 }
