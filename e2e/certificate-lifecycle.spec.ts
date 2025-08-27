@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import * as pkijs from 'pkijs';
 import { webcrypto } from 'crypto';
-import { X509Utils } from '../../src/lib/crypto';
+import { X509Utils } from '../src/lib/crypto';
 
 // Helper function to self-sign a CSR
 async function selfSignCSR(csrPem: string, privateKeyPem: string): Promise<string> {

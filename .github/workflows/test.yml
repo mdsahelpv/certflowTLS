@@ -1,0 +1,356 @@
+name: Test Suite
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Run tests daily at 2 AM UTC
+    - cron: '0 2 * * *'
+
+env:
+  NODE_VERSION: '18'
+  DATABASE_URL: 'file:./test.db'
+
+jobs:
+  # Unit and Integration Tests
+  unit-tests:
+    name: Unit & Integration Tests
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        node-version: [18, 20]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Generate Prisma client
+        run: npx prisma generate
+        
+      - name: Setup test database
+        run: |
+          npx prisma db push --force-reset --schema=./prisma/schema.sqlite
+          cp env.sqlite .env
+          
+      - name: Run unit tests
+        run: npm test -- --coverage --watchAll=false
+        
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage/lcov.info
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+          
+      - name: Upload test results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: test-results-${{ matrix.node-version }}
+          path: |
+            coverage/
+            test-results/
+            
+  # E2E Tests
+  e2e-tests:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        browser: [chromium, firefox, webkit]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps ${{ matrix.browser }}
+        
+      - name: Generate Prisma client
+        run: npx prisma generate
+        
+      - name: Setup test database
+        run: |
+          npx prisma db push --force-reset --schema=./prisma/schema.sqlite
+          cp env.sqlite .env
+          
+      - name: Start application
+        run: |
+          npm run build
+          npm start &
+          sleep 10
+          
+      - name: Run E2E tests
+        run: npx playwright test --project=${{ matrix.browser }} --reporter=html
+        
+      - name: Upload E2E test results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: e2e-results-${{ matrix.browser }}
+          path: |
+            test-results/
+            playwright-report/
+            
+  # Visual Regression Tests
+  visual-regression:
+    name: Visual Regression Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+        
+      - name: Generate Prisma client
+        run: npx prisma generate
+        
+      - name: Setup test database
+        run: |
+          npx prisma db push --force-reset --schema=./prisma/schema.sqlite
+          cp env.sqlite .env
+          
+      - name: Start application
+        run: |
+          npm run build
+          npm start &
+          sleep 10
+          
+      - name: Run visual regression tests
+        run: npx playwright test visual-regression.spec.ts --project=chromium --reporter=html
+        
+      - name: Upload visual regression results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: visual-regression-results
+          path: |
+            test-results/
+            playwright-report/
+            
+  # Accessibility Tests
+  accessibility:
+    name: Accessibility Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+        
+      - name: Generate Prisma client
+        run: npx prisma generate
+        
+      - name: Setup test database
+        run: |
+          npx prisma db push --force-reset --schema=./prisma/schema.sqlite
+          cp env.sqlite .env
+          
+      - name: Start application
+        run: |
+          npm run build
+          npm start &
+          sleep 10
+          
+      - name: Run accessibility tests
+        run: npx playwright test accessibility.spec.ts --project=chromium --reporter=html
+        
+      - name: Upload accessibility test results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: accessibility-results
+          path: |
+            test-results/
+            playwright-report/
+            
+  # Performance Tests
+  performance:
+    name: Performance Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+        
+      - name: Generate Prisma client
+        run: npx prisma generate
+        
+      - name: Setup test database
+        run: |
+          npx prisma db push --force-reset --schema=./prisma/schema.sqlite
+          cp env.sqlite .env
+          
+      - name: Start application
+        run: |
+          npm run build
+          npm start &
+          sleep 10
+          
+      - name: Run performance tests
+        run: npx playwright test performance-security.spec.ts --project=chromium --reporter=html
+        
+      - name: Upload performance test results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: performance-results
+          path: |
+            test-results/
+            playwright-report/
+            
+  # Security Tests
+  security:
+    name: Security Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+        
+      - name: Generate Prisma client
+        run: npx prisma generate
+        
+      - name: Setup test database
+        run: |
+          npx prisma db push --force-reset --schema=./prisma/schema.sqlite
+          cp env.sqlite .env
+          
+      - name: Start application
+        run: |
+          npm run build
+          npm start &
+          sleep 10
+          
+      - name: Run security tests
+        run: npx playwright test performance-security.spec.ts --project=chromium --reporter=html --grep="security"
+        
+      - name: Upload security test results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: security-results
+          path: |
+            test-results/
+            playwright-report/
+            
+  # Test Summary and Reporting
+  test-summary:
+    name: Test Summary
+    runs-on: ubuntu-latest
+    needs: [unit-tests, e2e-tests, visual-regression, accessibility, performance, security]
+    if: always()
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Download all test results
+        uses: actions/download-artifact@v3
+        with:
+          path: test-artifacts
+          
+      - name: Generate test summary
+        run: |
+          echo "# Test Results Summary" > TEST_SUMMARY.md
+          echo "" >> TEST_SUMMARY.md
+          echo "## Test Coverage" >> TEST_SUMMARY.md
+          echo "- Unit Tests: ${{ needs.unit-tests.result }}" >> TEST_SUMMARY.md
+          echo "- E2E Tests: ${{ needs.e2e-tests.result }}" >> TEST_SUMMARY.md
+          echo "- Visual Regression: ${{ needs.visual-regression.result }}" >> TEST_SUMMARY.md
+          echo "- Accessibility: ${{ needs.accessibility.result }}" >> TEST_SUMMARY.md
+          echo "- Performance: ${{ needs.performance.result }}" >> TEST_SUMMARY.md
+          echo "- Security: ${{ needs.security.result }}" >> TEST_SUMMARY.md
+          echo "" >> TEST_SUMMARY.md
+          echo "## Test Artifacts" >> TEST_SUMMARY.md
+          echo "Download test results from the Actions tab for detailed reports." >> TEST_SUMMARY.md
+          
+      - name: Upload test summary
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-summary
+          path: TEST_SUMMARY.md
+          
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            const summary = fs.readFileSync('TEST_SUMMARY.md', 'utf8');
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: summary
+            });
