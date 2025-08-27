@@ -10,10 +10,7 @@ const customJestConfig = {
   setupFilesAfterEnv: ['<rootDir>/test/setup.tsx'],
   setupFiles: ['<rootDir>/test/setup-global.ts'],
   testEnvironment: 'jsdom',
-  testEnvironmentOptions: {
-    customExportConditions: [''],
-  },
-  testPathIgnorePatterns: ['<rootDir>/.next/', '<rootDir>/node_modules/', '<rootDir>/test/e2e/'],
+  testPathIgnorePatterns: ['<rootDir>/.next/', '<rootDir>/node_modules/', '<rootDir>/e2e/'],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
   },
@@ -23,7 +20,11 @@ const customJestConfig = {
     '!src/**/*.stories.{js,jsx,ts,tsx}',
     '!src/**/*.test.{js,jsx,ts,tsx}',
     '!src/**/*.spec.{js,jsx,ts,tsx}',
+    '!src/**/index.{js,jsx,ts,tsx}',
+    '!src/**/types.{js,jsx,ts,tsx}',
   ],
+  coverageDirectory: 'coverage',
+  coverageReporters: ['text', 'lcov', 'html'],
   coverageThreshold: {
     global: {
       branches: 70,
@@ -36,17 +37,7 @@ const customJestConfig = {
     '<rootDir>/test/**/*.test.{js,jsx,ts,tsx}',
     '<rootDir>/test/**/*.spec.{js,jsx,ts,tsx}',
   ],
-  moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json'],
-  transform: {
-    '^.+\\.(ts|tsx)$': ['ts-jest', {
-      tsconfig: 'tsconfig.test.json'
-    }],
-  },
-  globals: {
-    'ts-jest': {
-      tsconfig: 'tsconfig.test.json',
-    },
-  },
+  testTimeout: 30000, // 30 seconds for integration tests
 }
 
 // createJestConfig is exported this way to ensure that next/jest can load the Next.js config which is async

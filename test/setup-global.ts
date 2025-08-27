@@ -5,6 +5,12 @@ import { TextEncoder, TextDecoder } from 'util';
 global.TextEncoder = TextEncoder;
 global.TextDecoder = TextDecoder as any;
 
+// Polyfill for setImmediate (needed for Prisma)
+global.setImmediate = global.setImmediate || ((fn: Function, ...args: any[]) => setTimeout(fn, 0, ...args));
+
+// Polyfill for clearImmediate
+global.clearImmediate = global.clearImmediate || ((id: any) => clearTimeout(id));
+
 // Mock Next.js Request/Response
 global.Request = class MockRequest {
   url: string;
@@ -42,3 +48,4 @@ global.Response = class MockResponse {
 process.env.NODE_ENV = 'test';
 process.env.NEXTAUTH_SECRET = 'test-secret';
 process.env.ENCRYPTION_KEY = 'test-key-32-characters-long';
+process.env.DATABASE_URL = 'file:./test.db';
