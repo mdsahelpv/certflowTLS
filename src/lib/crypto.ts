@@ -761,49 +761,60 @@ export class X509Utils {
     // 1. Basic Constraints (CRITICAL for CA certificates)
     const basicConstraints: any = { 
       name: 'basicConstraints', 
-      cA: isCA,
+      value: {
+        cA: isCA,
+      },
       critical: isCA // Critical for CA certificates
     };
     
     // Add path length constraint for CA certificates
     if (isCA && opts?.pathLenConstraint !== undefined) {
-      basicConstraints.pathLenConstraint = opts.pathLenConstraint;
+      basicConstraints.value.pathLenConstraint = opts.pathLenConstraint;
     }
     extensions.push(basicConstraints);
 
     // 2. Key Usage (CRITICAL for CA certificates)
     const keyUsage: any = { 
       name: 'keyUsage',
+      value: {},
       critical: isCA // Critical for CA certificates
     };
 
     if (isCA) {
       // CA-specific key usage
-      keyUsage.keyCertSign = true;    // Certificate signing
-      keyUsage.cRLSign = true;        // CRL signing
-      keyUsage.digitalSignature = true; // Digital signature
+      keyUsage.value.keyCertSign = true;    // Certificate signing
+      keyUsage.value.cRLSign = true;        // CRL signing
+      keyUsage.value.digitalSignature = true; // Digital signature
     } else {
       // End-entity key usage based on certificate type
-      keyUsage.digitalSignature = true;
-      keyUsage.keyEncipherment = true;
-      keyUsage.dataEncipherment = true;
-      keyUsage.keyAgreement = false;
-      keyUsage.keyCertSign = false;
-      keyUsage.cRLSign = false;
-      keyUsage.encipherOnly = false;
-      keyUsage.decipherOnly = false;
+      keyUsage.value.digitalSignature = true;
+      keyUsage.value.keyEncipherment = true;
+      keyUsage.value.dataEncipherment = true;
+      keyUsage.value.keyAgreement = false;
+      keyUsage.value.keyCertSign = false;
+      keyUsage.value.cRLSign = false;
+      keyUsage.value.encipherOnly = false;
+      keyUsage.value.decipherOnly = false;
     }
     extensions.push(keyUsage);
 
     // 3. Subject Key Identifier (Non-critical)
-    extensions.push({ name: 'subjectKeyIdentifier', critical: false });
+    extensions.push({ 
+      name: 'subjectKeyIdentifier', 
+      value: this.getSubjectKeyIdentifierFromCSR(csr),
+      critical: false 
+    });
 
     // 4. Authority Key Identifier (Non-critical)
-    extensions.push({ name: 'authorityKeyIdentifier', keyIdentifier: this.getSubjectKeyIdentifier(caCert), critical: false });
+    extensions.push({ 
+      name: 'authorityKeyIdentifier', 
+      value: { keyIdentifier: this.getSubjectKeyIdentifier(caCert) },
+      critical: false 
+    });
 
     // 5. Extended Key Usage (Non-critical, purpose-specific)
     if (opts?.extKeyUsage) {
-      const extKeyUsage: any = { name: 'extKeyUsage', critical: false };
+      const extKeyUsage: any = { name: 'extKeyUsage', value: {}, critical: false };
       const anySet = (
         opts.extKeyUsage.serverAuth ||
         opts.extKeyUsage.clientAuth ||
@@ -813,12 +824,12 @@ export class X509Utils {
         opts.extKeyUsage.ocspSigning
       );
       if (anySet) {
-        if (opts.extKeyUsage.serverAuth) extKeyUsage.serverAuth = true;
-        if (opts.extKeyUsage.clientAuth) extKeyUsage.clientAuth = true;
-        if (opts.extKeyUsage.codeSigning) extKeyUsage.codeSigning = true;
-        if (opts.extKeyUsage.emailProtection) extKeyUsage.emailProtection = true;
-        if (opts.extKeyUsage.timeStamping) extKeyUsage.timeStamping = true;
-        if (opts.extKeyUsage.ocspSigning) extKeyUsage.ocspSigning = true;
+        if (opts.extKeyUsage.serverAuth) extKeyUsage.value.serverAuth = true;
+        if (opts.extKeyUsage.clientAuth) extKeyUsage.value.clientAuth = true;
+        if (opts.extKeyUsage.codeSigning) extKeyUsage.value.codeSigning = true;
+        if (opts.extKeyUsage.emailProtection) extKeyUsage.value.emailProtection = true;
+        if (opts.extKeyUsage.timeStamping) extKeyUsage.value.timeStamping = true;
+        if (opts.extKeyUsage.ocspSigning) extKeyUsage.value.ocspSigning = true;
         extensions.push(extKeyUsage);
       }
     }
@@ -836,7 +847,7 @@ export class X509Utils {
       });
       extensions.push({ 
         name: 'subjectAltName', 
-        altNames,
+        value: { altNames },
         critical: false
       });
     }
@@ -847,7 +858,11 @@ export class X509Utils {
         policyIdentifier: policyOid,
         policyQualifiers: [] // Can be extended with policy qualifiers
       }));
-      extensions.push({ name: 'certificatePolicies', value: policyIdentifiers, critical: false });
+      extensions.push({ 
+        name: 'certificatePolicies', 
+        value: { policyIdentifiers }, 
+        critical: false 
+      });
     }
 
     // 8. Policy Constraints (CRITICAL for CA certificates) — disabled for compatibility
@@ -883,16 +898,18 @@ export class X509Utils {
     if (opts?.ocspUrl) {
       extensions.push({
         name: 'authorityInfoAccess',
-        accessDescriptions: [
-          {
-            accessMethod: '1.3.6.1.5.5.7.48.1', // OCSP
-            accessLocation: { type: 6, value: opts.ocspUrl },
-          },
-          {
-            accessMethod: '1.3.6.1.5.5.7.48.2', // CA Issuers
-            accessLocation: { type: 6, value: opts.ocspUrl.replace('/ocsp', '/ca') },
-          },
-        ],
+        value: {
+          accessDescriptions: [
+            {
+              accessMethod: '1.3.6.1.5.5.7.48.1', // OCSP
+              accessLocation: { type: 6, value: opts.ocspUrl },
+            },
+            {
+              accessMethod: '1.3.6.1.5.5.7.48.2', // CA Issuers
+              accessLocation: { type: 6, value: opts.ocspUrl.replace('/ocsp', '/ca') },
+            },
+          ],
+        },
         critical: false
       });
     }
@@ -969,23 +986,29 @@ export class X509Utils {
     const extensions: any[] = [
       {
         name: 'basicConstraints',
-        cA: true,
-        pathLenConstraint: 0,
+        value: {
+          cA: true,
+          pathLenConstraint: 0,
+        },
         critical: true,
       },
       {
         name: 'keyUsage',
-        keyCertSign: true,
-        cRLSign: true,
+        value: {
+          keyCertSign: true,
+          cRLSign: true,
+        },
         critical: true,
       },
       {
-        name: 'subjectKeyIdentifier'
+        name: 'subjectKeyIdentifier',
+        value: this.getSubjectKeyIdentifierFromCSR(csr),
+        critical: false,
       },
       // Authority Key Identifier for self-signed certs is the same as Subject Key Identifier
       {
         name: 'authorityKeyIdentifier',
-        keyIdentifier: this.getSubjectKeyIdentifierFromCSR(csr),
+        value: { keyIdentifier: this.getSubjectKeyIdentifierFromCSR(csr) },
         critical: false,
       },
     ];
@@ -1003,12 +1026,14 @@ export class X509Utils {
     if (opts?.ocspUrl) {
       extensions.push({
         name: 'authorityInfoAccess',
-        accessDescriptions: [
-          {
-            accessMethod: '1.3.6.1.5.5.7.48.1', // OCSP
-            accessLocation: { type: 6, value: opts.ocspUrl },
-          },
-        ],
+        value: {
+          accessDescriptions: [
+            {
+              accessMethod: '1.3.6.1.5.5.7.48.1', // OCSP
+              accessLocation: { type: 6, value: opts.ocspUrl },
+            },
+          ],
+        },
         critical: false
       });
     }
