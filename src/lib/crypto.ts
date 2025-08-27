@@ -1,6 +1,6 @@
 import * as crypto from 'crypto';
 import type { CipherGCM, DecipherGCM, CipherGCMTypes } from 'crypto';
-import forge from 'node-forge';
+import * as forge from 'node-forge';
 
 // Encryption utilities for sensitive data at rest
 export class Encryption {
@@ -213,7 +213,7 @@ export class CRLUtils {
     for (const rc of revokedCertificates) {
       const revokedCertificate = new pkijs.RevokedCertificate({
         userCertificate: new asn1js.Integer({ value: parseInt(rc.serialNumber, 16) }),
-        revocationDate: rc.revocationDate,
+        revocationDate: new pkijs.Time({ value: rc.revocationDate }),
       });
       // TODO: Add revocation reason extension
       crl.revokedCertificates.push(revokedCertificate);
@@ -236,7 +236,7 @@ export class CRLUtils {
         extnValue: new pkijs.AuthorityKeyIdentifier({ keyIdentifier: new asn1js.OctetString({ valueHex: authorityKeyIdentifierHashed }) }).toSchema().toBER(false),
     }));
 
-    crl.extensions = new pkijs.Extensions({ extensions });
+    crl.crlExtensions = new pkijs.Extensions({ extensions });
 
     // Sign the CRL
     const privateKeyBuffer = Buffer.from(caPrivateKeyPem.replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|[\r\n]/g, ''), 'base64');
@@ -280,7 +280,7 @@ export class CRLUtils {
     for (const rc of revokedCertificates) {
       const revokedCertificate = new pkijs.RevokedCertificate({
         userCertificate: new asn1js.Integer({ value: parseInt(rc.serialNumber, 16) }),
-        revocationDate: rc.revocationDate,
+        revocationDate: new pkijs.Time({ value: rc.revocationDate }),
       });
       crl.revokedCertificates.push(revokedCertificate);
     }
@@ -307,7 +307,7 @@ export class CRLUtils {
         extnValue: new pkijs.AuthorityKeyIdentifier({ keyIdentifier: new asn1js.OctetString({ valueHex: authorityKeyIdentifierHashed }) }).toSchema().toBER(false),
     }));
 
-    crl.extensions = new pkijs.Extensions({ extensions });
+    crl.crlExtensions = new pkijs.Extensions({ extensions });
 
     const privateKeyBuffer = Buffer.from(caPrivateKeyPem.replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|[\r\n]/g, ''), 'base64');
     const privateKey = await crypto.importKey("pkcs8", privateKeyBuffer, { name: "RSASSA-PKCS1-v1_5", hash: { name: "SHA-256" } }, true, ["sign"]);
@@ -393,7 +393,7 @@ export class X509Utils {
         } else {
           // Verify signature with issuer's public key
           try {
-            if (!currentCert.verify(issuerCert.publicKey)) {
+            if (!currentCert.verify(issuerCert.publicKey as any)) {
               const issuerCN = issuerCert.subject.getField('CN')?.value || 'Unknown';
               issues.push(`Certificate signature verification failed with issuer: ${issuerCN}`);
             }
@@ -460,8 +460,8 @@ export class X509Utils {
       
       // Check if it's a self-signed root with proper CA constraints
       if (this.isSelfSigned(rootCert)) {
-        const basicConstraints = rootCert.getExtension('basicConstraints');
-        const keyUsage = rootCert.getExtension('keyUsage');
+        const basicConstraints = rootCert.getExtension('basicConstraints') as any;
+        const keyUsage = rootCert.getExtension('keyUsage') as any;
         
         if (basicConstraints?.cA && keyUsage?.keyCertSign) {
           return { isTrusted: true };
@@ -526,7 +526,7 @@ export class X509Utils {
   // Check if certificate is self-signed
   private static isSelfSigned(cert: forge.pki.Certificate): boolean {
     try {
-      return cert.verify(cert.publicKey);
+      return cert.verify(cert.publicKey as any);
     } catch {
       return false;
     }
@@ -1019,7 +1019,7 @@ export class X509Utils {
     return forge.pki.certificateToPem(cert);
   }
 
-  private static getSubjectKeyIdentifierFromCSR(csr: forge.pki.CertificationRequest): string {
+  private static getSubjectKeyIdentifierFromCSR(csr: any): string {
     const publicKeyDer = forge.asn1.toDer(forge.pki.publicKeyToAsn1(csr.publicKey)).getBytes();
     const sha1 = forge.md.sha1.create();
     sha1.update(publicKeyDer);
