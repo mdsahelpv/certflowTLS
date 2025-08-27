@@ -31,26 +31,23 @@ global.Request = class MockRequest {
   get body() { return this._body; }
 } as any;
 
-global.Response = class MockResponse {
-  status: number;
-  statusText: string;
-  headers: Headers;
-  body: any;
-
-  constructor(body?: any, init?: any) {
-    this.status = init?.status || 200;
-    this.statusText = init?.statusText || 'OK';
-    this.headers = new Headers(init?.headers || {});
-    this.body = body || null;
-  }
-
-  static json(data: any, init?: any): MockResponse {
-    return new MockResponse(JSON.stringify(data), init);
-  }
-} as any;
+// Do not override global Response; NextResponse returns a web Response which Jest can handle
 
 // Mock environment variables
 process.env.NODE_ENV = 'test';
 process.env.NEXTAUTH_SECRET = 'test-secret';
 process.env.ENCRYPTION_KEY = 'test-key-32-characters-long';
 process.env.DATABASE_URL = 'file:./test.db';
+
+// Mock matchMedia for UI components depending on next-themes or media queries
+if (!(global as any).window) (global as any).window = {} as any;
+(global as any).window.matchMedia = (global as any).window.matchMedia || ((query: string) => ({
+  matches: false,
+  media: query,
+  onchange: null,
+  addListener: () => {},
+  removeListener: () => {},
+  addEventListener: () => {},
+  removeEventListener: () => {},
+  dispatchEvent: () => false,
+}));
