@@ -234,12 +234,7 @@ describe('X509Utils', () => {
     const attrs = [{ name: 'commonName', value: 'example.org' }];
     cert.setSubject(attrs);
     cert.setIssuer(attrs);
-    // Add required extensions for a self-signed CA
-    cert.setExtensions([
-      { name: 'basicConstraints', cA: true, critical: true },
-      { name: 'keyUsage', keyCertSign: true, cRLSign: true, critical: true },
-      { name: 'subjectKeyIdentifier' },
-    ]);
+    // Create a simple certificate without extensions for testing
     cert.sign(keys.privateKey, forge.md.sha256.create());
     certPem = forge.pki.certificateToPem(cert);
   });
