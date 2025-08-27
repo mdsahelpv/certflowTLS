@@ -107,21 +107,30 @@ export async function DELETE(
       return NextResponse.json({ error: 'CA id is required' }, { status: 400 });
     }
 
-    // Delete certificates, CRLs, and CA config in a transaction
-    await db.$transaction(async (tx) => {
-      await tx.certificateRevocation.deleteMany({ where: { certificate: { caId: id } as any } });
-      await tx.certificate.deleteMany({ where: { caId: id } });
-      await tx.cRL.deleteMany({ where: { caId: id } });
-      await tx.cAConfig.delete({ where: { id } });
-    });
+    // Delete certificates, CRLs, and CA config in a transaction; tolerate partial audit failures
+    try {
+      await db.$transaction(async (tx) => {
+        await tx.certificateRevocation.deleteMany({ where: { certificate: { caId: id } as any } });
+        await tx.certificate.deleteMany({ where: { caId: id } });
+        await tx.cRL.deleteMany({ where: { caId: id } });
+        await tx.cAConfig.delete({ where: { id } });
+      });
+    } catch (e) {
+      console.error('CA delete transaction failed', e);
+      return NextResponse.json({ error: 'Failed to delete CA' }, { status: 500 });
+    }
 
-    await AuditService.log({
-      action: AuditAction.CA_DELETED,
-      userId: session.user.id,
-      username: session.user.username,
-      description: `CA deleted: ${id}`,
-      metadata: { caId: id }
-    });
+    try {
+      await AuditService.log({
+        action: AuditAction.CA_DELETED,
+        userId: session.user.id,
+        username: session.user.username,
+        description: `CA deleted: ${id}`,
+        metadata: { caId: id }
+      });
+    } catch (e) {
+      console.warn('Audit log failed for CA delete', e);
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

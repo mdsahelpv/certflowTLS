@@ -20,7 +20,7 @@ export class SystemInitializer {
       // Create default system configurations
       await this.createSystemConfigs();
 
-      // Ensure a demo CA exists and is ACTIVE for immediate testing
+      // Ensure a demo CA exists and is ACTIVE (or activate existing initializing CA)
       await this.ensureDemoCA();
       
       logger.info('System initialization completed successfully');
@@ -74,7 +74,7 @@ export class SystemInitializer {
         return;
       }
 
-      // If any CA exists, do nothing (respect existing configuration)
+      // If any CA exists (regardless of status), do nothing. Admin may manage it.
       const existing = await db.cAConfig.findMany({ take: 1 });
       if (existing.length > 0) {
         logger.ca.info('Existing CA configuration detected; skipping demo CA creation', {
