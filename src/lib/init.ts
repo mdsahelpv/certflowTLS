@@ -74,69 +74,14 @@ export class SystemInitializer {
         return;
       }
 
-      // If a CA exists
-      const existing = await db.cAConfig.findMany({ take: 1, orderBy: { createdAt: 'asc' } });
+      // If any CA exists (regardless of status), do nothing. Admin may manage it.
+      const existing = await db.cAConfig.findMany({ take: 1 });
       if (existing.length > 0) {
-        const ca = existing[0];
-        if (ca.status === 'ACTIVE') {
-          logger.ca.info('Active CA detected; skipping demo CA creation', { id: ca.id });
-          return;
-        }
-
-        // Attempt to activate initializing CA by self-signing
-        try {
-          const subjectDN = ca.subjectDN || process.env.DEMO_CA_SUBJECT_DN || 'C=US,ST=California,L=San Francisco,O=Demo Organization,OU=Demo CA,CN=Demo Root CA';
-          const keyAlgorithm = (ca.keyAlgorithm as any) || (process.env.DEMO_CA_ALGO || 'RSA');
-          const keySize = ca.keySize || Number(process.env.DEMO_CA_RSA_BITS || '2048');
-          const curve = ca.curve || process.env.DEMO_CA_EC_CURVE || 'P-256';
-          const validityDays = Number(process.env.DEMO_CA_VALIDITY_DAYS || '3650');
-          const crlUrl = ca.crlDistributionPoint || process.env.CRL_DISTRIBUTION_POINT || 'http://localhost:3000/api/crl/download/latest';
-          const ocspUrl = ca.ocspUrl || process.env.OCSP_URL || 'http://localhost:3000/api/ocsp';
-
-          let privateKeyPem: string | undefined;
-          if (ca.privateKey) {
-            try {
-              const enc = JSON.parse(ca.privateKey);
-              privateKeyPem = Encryption.decrypt(enc.encrypted, enc.iv, enc.tag);
-            } catch {}
-          }
-          // If no private key, generate one and persist
-          if (!privateKeyPem) {
-            const { privateKey } = CSRUtils.generateKeyPair(keyAlgorithm as any, keyAlgorithm === 'RSA' ? keySize : undefined, keyAlgorithm === 'ECDSA' ? curve : undefined);
-            privateKeyPem = privateKey;
-            const encryptedKey = Encryption.encrypt(privateKeyPem);
-            await db.cAConfig.update({ where: { id: ca.id }, data: { privateKey: JSON.stringify(encryptedKey), keyAlgorithm, keySize: keyAlgorithm === 'RSA' ? keySize : undefined, curve: keyAlgorithm === 'ECDSA' ? curve : undefined } });
-          }
-
-          // Build CSR and self-sign
-          const subject = CertificateUtils.parseDN(subjectDN);
-          const { publicKey } = CSRUtils.generateKeyPair(keyAlgorithm as any, keyAlgorithm === 'RSA' ? keySize : undefined, keyAlgorithm === 'ECDSA' ? curve : undefined);
-          const csr = CSRUtils.generateCSR(subject, privateKeyPem, publicKey);
-          const certificate = X509Utils.selfSignCSR(csr, privateKeyPem, validityDays, { crlDistributionPointUrl: crlUrl, ocspUrl });
-          const { notBefore, notAfter } = X509Utils.parseCertificateDates(certificate);
-
-          await db.cAConfig.update({
-            where: { id: ca.id },
-            data: {
-              subjectDN,
-              csr,
-              certificate,
-              status: 'ACTIVE',
-              validFrom: notBefore,
-              validTo: notAfter,
-              crlDistributionPoint: crlUrl,
-              ocspUrl,
-            },
-          });
-
-          try {
-            await AuditService.log({ action: 'CA_CERTIFICATE_UPLOADED', description: 'Initializing CA auto-activated on startup', metadata: { caId: ca.id, subjectDN } });
-          } catch {}
-          logger.ca.info('Initializing CA activated on startup', { id: ca.id });
-          return;
-        } catch (e) {
-          logger.ca.warn('Failed to activate existing initializing CA on startup; will attempt to create demo CA if none', { error: e instanceof Error ? e.message : String(e), id: existing[0].id });
-        }
+        logger.ca.info('Existing CA configuration detected; skipping demo CA creation', {
+          status: existing[0].status,
+          id: existing[0].id,
+        });
+        return;
       }
 
       // Defaults
