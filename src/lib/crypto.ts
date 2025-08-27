@@ -986,35 +986,11 @@ export class X509Utils {
     const extensions: any[] = [
       {
         name: 'basicConstraints',
-        value: {
-          cA: true,
-          pathLenConstraint: 0,
-        },
+        value: { cA: true },
         critical: true,
-      },
-      {
-        name: 'keyUsage',
-        value: {
-          keyCertSign: true,
-          cRLSign: true,
-        },
-        critical: true,
-      },
-      {
-        name: 'subjectKeyIdentifier',
-        value: this.getSubjectKeyIdentifierFromCSR(csr),
-        critical: false,
-      },
-      // Authority Key Identifier for self-signed certs is the same as Subject Key Identifier
-      {
-        name: 'authorityKeyIdentifier',
-        value: { keyIdentifier: this.getSubjectKeyIdentifierFromCSR(csr) },
-        critical: false,
       },
     ];
-    // Note: For maximum compatibility across environments (including edge/runtime bundlers),
-    // we omit CRL Distribution Points and Authority Info Access on the self-signed root.
-    // These can be added later via a dedicated certificate management flow if needed.
+    // Minimal extension set: only Basic Constraints to avoid node-forge DER issues in certain runtimes.
 
     cert.setExtensions(extensions);
     cert.sign(privateKey, forge.md.sha256.create());
