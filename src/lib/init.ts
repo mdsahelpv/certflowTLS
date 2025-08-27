@@ -3,7 +3,8 @@ import { AuthService } from '@/lib/auth';
 import { NotificationService } from '@/lib/notifications';
 import { logger } from '@/lib/logger';
 import { CAStatus, KeyAlgorithm } from '@prisma/client';
-import { CSRUtils, CertificateUtils, Encryption, X509Utils } from '@/lib/crypto';
+import { CSRUtils, CertificateUtils, Encryption } from '@/lib/crypto';
+import forge from 'node-forge';
 import { AuditService } from '@/lib/audit';
 
 export class SystemInitializer {
@@ -95,18 +96,32 @@ export class SystemInitializer {
 
       logger.ca.info('Creating self-signed demo CA on startup');
 
-      // Generate key pair and CSR
+      // Generate key pair
       const { privateKey, publicKey } = CSRUtils.generateKeyPair(keyAlgorithm, keyAlgorithm === 'RSA' ? keySize : undefined, keyAlgorithm === 'ECDSA' ? curve : undefined);
-      const subject = CertificateUtils.parseDN(subjectDN);
-      const csr = CSRUtils.generateCSR(subject, privateKey, publicKey);
 
-      // Self-sign the CSR to produce a CA certificate
-      const certificate = X509Utils.selfSignCSR(csr, privateKey, validityDays, {
-        crlDistributionPointUrl: crlUrl,
-        ocspUrl,
-      });
+      // Create minimal self-signed CA certificate using forge directly, with no extensions
+      const cert = forge.pki.createCertificate();
+      cert.publicKey = forge.pki.publicKeyFromPem(publicKey) as any;
+      cert.serialNumber = new forge.jsbn.BigInteger(forge.util.bytesToHex(forge.random.getBytesSync(16)), 16).toString(16);
+      const now = new Date();
+      cert.validity.notBefore = now;
+      cert.validity.notAfter = new Date(now.getTime() + validityDays * 24 * 60 * 60 * 1000);
+      const subjectParts = CertificateUtils.parseDN(subjectDN);
+      const attrs: any[] = [];
+      if (subjectParts.C) attrs.push({ name: 'countryName', value: subjectParts.C });
+      if (subjectParts.ST) attrs.push({ name: 'stateOrProvinceName', value: subjectParts.ST });
+      if (subjectParts.L) attrs.push({ name: 'localityName', value: subjectParts.L });
+      if (subjectParts.O) attrs.push({ name: 'organizationName', value: subjectParts.O });
+      if (subjectParts.OU) attrs.push({ name: 'organizationalUnitName', value: subjectParts.OU });
+      if (subjectParts.CN) attrs.push({ name: 'commonName', value: subjectParts.CN });
+      cert.setSubject(attrs);
+      cert.setIssuer(attrs);
+      const privKey = forge.pki.privateKeyFromPem(privateKey) as any;
+      cert.sign(privKey, forge.md.sha256.create());
+      const certificate = forge.pki.certificateToPem(cert);
 
-      const { notBefore, notAfter } = X509Utils.parseCertificateDates(certificate);
+      const notBefore = cert.validity.notBefore;
+      const notAfter = cert.validity.notAfter;
       const encryptedKey = Encryption.encrypt(privateKey);
 
       // Store CA configuration as ACTIVE
@@ -115,7 +130,6 @@ export class SystemInitializer {
           name: 'Demo CA',
           subjectDN,
           privateKey: JSON.stringify(encryptedKey),
-          csr,
           certificate,
           keyAlgorithm,
           keySize: keyAlgorithm === 'RSA' ? keySize : undefined,
