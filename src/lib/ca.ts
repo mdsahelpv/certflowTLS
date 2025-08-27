@@ -275,6 +275,17 @@ export class CAService {
     // Store certificate
     const { notBefore: validFrom, notAfter: validTo } = X509Utils.parseCertificateDates(certificate);
 
+    // Verify issuer user exists to avoid FK violations in environments where default admin wasn't created yet
+    let resolvedIssuedById: string | undefined = issuedById;
+    try {
+      if (issuedById) {
+        const user = await db.user.findUnique({ where: { id: issuedById } });
+        if (!user) resolvedIssuedById = undefined;
+      }
+    } catch {
+      resolvedIssuedById = undefined;
+    }
+
     await db.certificate.create({
       data: {
         serialNumber,
@@ -292,7 +303,7 @@ export class CAService {
         validTo,
         sans: data.sans ? JSON.stringify(data.sans) : null,
         fingerprint,
-        issuedById,
+        issuedById: resolvedIssuedById,
         caId: caConfig.id,
       },
     });
