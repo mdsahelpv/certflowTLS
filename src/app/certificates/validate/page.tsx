@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
@@ -54,6 +55,7 @@ export default function CertificateValidationPage() {
   const [isValidating, setIsValidating] = useState(false);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [uploadError, setUploadError] = useState('');
   
   // Advanced validation options
   const [validationOptions, setValidationOptions] = useState({
@@ -139,6 +141,20 @@ export default function CertificateValidationPage() {
   const getStatusIcon = (ok: boolean) => (ok ? <CheckCircle className="h-6 w-6 text-green-500" /> : <XCircle className="h-6 w-6 text-red-500" />);
   const getStatusBadge = (ok: boolean) => (ok ? <Badge className="bg-green-100 text-green-800">Valid</Badge> : <Badge variant="destructive">Invalid</Badge>);
 
+  const getCN = (cert: any): string => {
+    try {
+      const subj = cert?.subject;
+      if (subj && typeof subj.getField === 'function') {
+        return subj.getField('CN')?.value || 'Unknown';
+      }
+      // Some backends may return parsed subject string
+      if (typeof subj === 'string') return subj;
+      return 'Unknown';
+    } catch {
+      return 'Unknown';
+    }
+  };
+
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
@@ -167,6 +183,42 @@ export default function CertificateValidationPage() {
                 rows={10}
                 className="font-mono text-sm"
               />
+              <div className="mt-2 flex items-center gap-3">
+                <Input
+                  id="certificate-file"
+                  type="file"
+                  accept=".pem,.crt,.cer,.der,.txt,application/x-x509-ca-cert,application/x-pem-file,text/plain"
+                  onChange={async (e) => {
+                    setUploadError('');
+                    try {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      if (file.type === 'application/x-x509-ca-cert' || file.name.toLowerCase().endsWith('.der')) {
+                        // For DER, prompt user to paste PEM after external conversion, or attempt a quick conversion via forge on server
+                        const buf = new Uint8Array(await file.arrayBuffer());
+                        // Send to server for validation directly as binary
+                        const res = await fetch('/api/certificates/validate', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ certificateBinary: Buffer.from(buf as any).toString('base64'), format: 'der', options: validationOptions })
+                        });
+                        const data = await res.json();
+                        if (!res.ok) throw new Error(data.error || 'Failed to validate DER certificate');
+                        setValidationResult(data.result);
+                        setSuccessMessage('Certificate validated successfully');
+                      } else {
+                        const text = await file.text();
+                        setCertificatePem(text);
+                      }
+                    } catch (ex: any) {
+                      setUploadError(ex?.message || 'Failed to read/validate file');
+                    }
+                  }}
+                />
+                {uploadError && (
+                  <span className="text-sm text-red-600">{uploadError}</span>
+                )}
+              </div>
             </div>
             {error && (
               <Alert variant="destructive">
@@ -399,7 +451,7 @@ export default function CertificateValidationPage() {
                   </div>
                   
                   {/* Detailed Chain Display */}
-                  {validationResult.chain.length > 0 && (
+                  {Array.isArray(validationResult.chain) && validationResult.chain.length > 0 && (
                     <div className="mt-4">
                       <h4 className="font-medium text-sm mb-2">Chain Details:</h4>
                       <div className="space-y-2">
@@ -408,7 +460,7 @@ export default function CertificateValidationPage() {
                             <div className="flex items-center gap-2">
                               <span className="font-mono">#{index + 1}</span>
                               <span className="font-mono">
-                                {chainItem.cert.subject.getField('CN')?.value || 'Unknown CN'}
+                                {getCN(chainItem.cert)}
                               </span>
                             </div>
                             <Badge 
