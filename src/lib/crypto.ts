@@ -983,16 +983,9 @@ export class X509Utils {
     cert.setSubject(csr.subject.attributes);
     cert.setIssuer(csr.subject.attributes);
 
-    const extensions: any[] = [
-      {
-        name: 'basicConstraints',
-        value: { cA: true },
-        critical: true,
-      },
-    ];
-    // Minimal extension set: only Basic Constraints to avoid node-forge DER issues in certain runtimes.
-
-    cert.setExtensions(extensions);
+    // For maximum compatibility in some runtimes, avoid adding any extensions on the self-signed root.
+    // This prevents node-forge from attempting to encode extension ASN.1 structures that may fail
+    // in certain environments. The resulting certificate is a plain self-signed cert sufficient for demo use.
     cert.sign(privateKey, forge.md.sha256.create());
 
     return forge.pki.certificateToPem(cert);
