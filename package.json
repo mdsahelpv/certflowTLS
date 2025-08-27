@@ -44,7 +44,9 @@
     "docker:compose:down": "docker compose down",
     "docker:compose:logs": "docker compose logs -f",
     "clean": "rm -rf .next node_modules/.cache",
-    "clean:all": "rm -rf .next node_modules/.cache db/*.db logs/*.log"
+    "clean:all": "rm -rf .next node_modules/.cache db/*.db logs/*.log",
+    "init:ca": "npx tsx scripts/init-ca.ts",
+    "init:ca:force": "npx tsx scripts/init-ca.ts --force"
   },
   "prisma": {
     "schema": "prisma/schema.prisma"

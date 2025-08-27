@@ -55,6 +55,7 @@ git clone <your-repo-url> && cd CER
 cp env.sqlite .env && mkdir -p db logs
 npm install && npx prisma generate && npx prisma db push
 export ADMIN_USERNAME=admin ADMIN_PASSWORD=admin123 && node create-admin.js
+npm run init:ca
 npm run dev
 ```
 
@@ -112,11 +113,30 @@ node create-admin.js
 ### **6. Set up the Root Certificate Authority (CA)**
 Before you can issue certificates, you must create the initial root CA. A helper script is provided for this.
 ```bash
-npx tsx init-ca.ts
+npm run init:ca
 ```
-This script will create a self-signed root CA and generate the first Certificate Revocation List (CRL). It only needs to be run once.
 
-**Note**: If you see "An active CA already exists", that's fine - the system is already initialized.
+**Force overwrite existing CA** (if needed):
+```bash
+npm run init:ca:force
+```
+
+This script will:
+- Create a self-signed root CA certificate (RSA-4096)
+- Generate and store the CA private key (encrypted)
+- Set up CA configuration with CRL and OCSP endpoints
+- Create an admin user (admin/admin123) if it doesn't exist
+- Log the initialization in the audit system
+
+**Note**: If you see "CA already exists in database", that's fine - the system is already initialized. Use `--force` to overwrite.
+
+**Default CA Details**:
+- **Name**: Development CA
+- **Algorithm**: RSA-4096
+- **Validity**: 10 years
+- **Admin User**: admin/admin123
+- **CRL URL**: http://localhost:3000/api/crl/latest
+- **OCSP URL**: http://localhost:3000/api/ocsp/binary
 
 ### **7. Run the Application**
 You can now start the development server.
