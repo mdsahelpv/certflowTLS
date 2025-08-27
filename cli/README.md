@@ -95,3 +95,38 @@ Manage Certificate Revocation Lists (CRLs).
     -   `--caId <id>`: The ID of the CA to generate the CRL for.
 -   `crl download`: Download the latest CRL.
     -   `--out <file>`: File path to save the CRL to. If not provided, prints to standard output.
+
+### `user`
+
+Manage users.
+
+-   `user list`: List all users.
+    -   `--limit <number>`: Number of users to return.
+    -   `--page <number>`: Page number for pagination.
+-   `user create`: Create a new user.
+    -   `--username <username>`: (Required) Username for the new user.
+    -   `--email <email>`: (Required) Email for the new user.
+    -   `--password <password>`: (Required) Password for the new user.
+    -   `--role <role>`: Role for the new user (e.g., `ADMIN`, `USER`). Default: `USER`.
+-   `user update`: Update an existing user.
+    -   `--id <id>`: (Required) The ID of the user to update.
+    -   `--username <username>`: New username for the user.
+    -   `--email <email>`: New email for the user.
+    -   `--role <role>`: New role for the user.
+-   `user delete`: Delete a user.
+    -   `--id <id>`: (Required) The ID of the user to delete.
+-   `user reset-password`: Reset a user's password.
+    -   `--id <id>`: (Required) The ID of the user whose password to reset.
+
+### `audit`
+
+Manage audit logs.
+
+-   `audit list`: List audit log entries.
+    -   `--limit <number>`: Number of entries to return.
+    -   `--page <number>`: Page number for pagination.
+    -   `--user <user>`: Filter by user ID or username.
+    -   `--action <action>`: Filter by action type.
+-   `audit export`: Export audit logs.
+    -   `--format <format>`: Export format (e.g., `json`, `csv`). Default: `json`.
+    -   `--out <file>`: File path to save the export to. If not provided, prints to standard output.

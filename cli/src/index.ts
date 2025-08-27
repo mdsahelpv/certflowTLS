@@ -494,4 +494,292 @@ crlCommand
     }
   });
 
+const userCommand = program.command('user').description('Manage users');
+
+userCommand
+  .command('list')
+  .description('List all users')
+  .option('--limit <limit>', 'Number of results to return', '20')
+  .option('--page <page>', 'Page number', '1')
+  .action(async (options) => {
+    const { server, token } = await getApiConfig(program.opts());
+    if (!token) {
+      console.error('❌ You are not logged in. Please run `login` first or provide a --token.');
+      return;
+    }
+
+    try {
+      const params = new URLSearchParams();
+      if (options.limit) params.append('limit', options.limit);
+      if (options.page) params.append('page', options.page);
+
+      const response = await axios.get(`${server}/api/users`, {
+        params,
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (response.status === 200) {
+        console.log('✅ Users retrieved successfully:');
+        console.log(JSON.stringify(response.data, null, 2));
+      } else {
+        console.error(`❌ Failed to list users. Server responded with status ${response.status}`);
+      }
+    } catch (error: any) {
+      console.error('❌ Failed to list users.');
+      if (error.response) {
+        console.error(`   - Status: ${error.response.status}`);
+        console.error(`   - Error: ${error.response.data?.error || 'Unknown error'}`);
+      } else {
+        console.error(`   - Error: ${error.message}`);
+      }
+    }
+  });
+
+userCommand
+  .command('create')
+  .description('Create a new user')
+  .requiredOption('--username <username>', 'Username for the new user')
+  .requiredOption('--email <email>', 'Email for the new user')
+  .requiredOption('--password <password>', 'Password for the new user')
+  .option('--role <role>', 'Role for the new user (e.g., ADMIN, USER)', 'USER')
+  .action(async (options) => {
+    const { server, token } = await getApiConfig(program.opts());
+    if (!token) {
+      console.error('❌ You are not logged in. Please run `login` first or provide a --token.');
+      return;
+    }
+
+    try {
+      const response = await axios.post(
+        `${server}/api/users/create`,
+        {
+          username: options.username,
+          email: options.email,
+          password: options.password,
+          role: options.role,
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      if (response.status === 200) {
+        console.log('✅ User created successfully:');
+        console.log(JSON.stringify(response.data, null, 2));
+      } else {
+        console.error(`❌ Failed to create user. Server responded with status ${response.status}`);
+      }
+    } catch (error: any) {
+      console.error('❌ Failed to create user.');
+      if (error.response) {
+        console.error(`   - Status: ${error.response.status}`);
+        console.error(`   - Error: ${error.response.data?.error || 'Unknown error'}`);
+      } else {
+        console.error(`   - Error: ${error.message}`);
+      }
+    }
+  });
+
+userCommand
+  .command('update')
+  .description('Update an existing user')
+  .requiredOption('--id <id>', 'ID of the user to update')
+  .option('--username <username>', 'New username for the user')
+  .option('--email <email>', 'New email for the user')
+  .option('--role <role>', 'New role for the user')
+  .action(async (options) => {
+    const { server, token } = await getApiConfig(program.opts());
+    if (!token) {
+      console.error('❌ You are not logged in. Please run `login` first or provide a --token.');
+      return;
+    }
+
+    try {
+      const payload: { id: string; username?: string; email?: string; role?: string } = { id: options.id };
+      if (options.username) payload.username = options.username;
+      if (options.email) payload.email = options.email;
+      if (options.role) payload.role = options.role;
+
+      const response = await axios.post(`${server}/api/users/update`, payload, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (response.status === 200) {
+        console.log('✅ User updated successfully:');
+        console.log(JSON.stringify(response.data, null, 2));
+      } else {
+        console.error(`❌ Failed to update user. Server responded with status ${response.status}`);
+      }
+    } catch (error: any) {
+      console.error('❌ Failed to update user.');
+      if (error.response) {
+        console.error(`   - Status: ${error.response.status}`);
+        console.error(`   - Error: ${error.response.data?.error || 'Unknown error'}`);
+      } else {
+        console.error(`   - Error: ${error.message}`);
+      }
+    }
+  });
+
+userCommand
+  .command('delete')
+  .description('Delete a user')
+  .requiredOption('--id <id>', 'ID of the user to delete')
+  .action(async (options) => {
+    const { server, token } = await getApiConfig(program.opts());
+    if (!token) {
+      console.error('❌ You are not logged in. Please run `login` first or provide a --token.');
+      return;
+    }
+
+    try {
+      const response = await axios.post(
+        `${server}/api/users/delete`,
+        { id: options.id },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      if (response.status === 200) {
+        console.log('✅ User deleted successfully.');
+      } else {
+        console.error(`❌ Failed to delete user. Server responded with status ${response.status}`);
+      }
+    } catch (error: any) {
+      console.error('❌ Failed to delete user.');
+      if (error.response) {
+        console.error(`   - Status: ${error.response.status}`);
+        console.error(`   - Error: ${error.response.data?.error || 'Unknown error'}`);
+      } else {
+        console.error(`   - Error: ${error.message}`);
+      }
+    }
+  });
+
+userCommand
+  .command('reset-password')
+  .description("Reset a user's password")
+  .requiredOption('--id <id>', "ID of the user whose password to reset")
+  .action(async (options) => {
+    const { server, token } = await getApiConfig(program.opts());
+    if (!token) {
+      console.error('❌ You are not logged in. Please run `login` first or provide a --token.');
+      return;
+    }
+
+    try {
+      const response = await axios.post(
+        `${server}/api/users/reset-password`,
+        { id: options.id },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      if (response.status === 200) {
+        console.log("✅ User's password reset successfully.");
+        console.log(JSON.stringify(response.data, null, 2));
+      } else {
+        console.error(`❌ Failed to reset user password. Server responded with status ${response.status}`);
+      }
+    } catch (error: any) {
+      console.error('❌ Failed to reset user password.');
+      if (error.response) {
+        console.error(`   - Status: ${error.response.status}`);
+        console.error(`   - Error: ${error.response.data?.error || 'Unknown error'}`);
+      } else {
+        console.error(`   - Error: ${error.message}`);
+      }
+    }
+  });
+
+const auditCommand = program.command('audit').description('Manage audit logs');
+
+auditCommand
+  .command('list')
+  .description('List audit log entries')
+  .option('--limit <limit>', 'Number of results to return', '20')
+  .option('--page <page>', 'Page number', '1')
+  .option('--user <user>', 'Filter by user ID or username')
+  .option('--action <action>', 'Filter by action type')
+  .action(async (options) => {
+    const { server, token } = await getApiConfig(program.opts());
+    if (!token) {
+      console.error('❌ You are not logged in. Please run `login` first or provide a --token.');
+      return;
+    }
+
+    try {
+      const params = new URLSearchParams();
+      if (options.limit) params.append('limit', options.limit);
+      if (options.page) params.append('page', options.page);
+      if (options.user) params.append('user', options.user);
+      if (options.action) params.append('action', options.action);
+
+      const response = await axios.get(`${server}/api/audit`, {
+        params,
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (response.status === 200) {
+        console.log('✅ Audit logs retrieved successfully:');
+        console.log(JSON.stringify(response.data, null, 2));
+      } else {
+        console.error(`❌ Failed to list audit logs. Server responded with status ${response.status}`);
+      }
+    } catch (error: any) {
+      console.error('❌ Failed to list audit logs.');
+      if (error.response) {
+        console.error(`   - Status: ${error.response.status}`);
+        console.error(`   - Error: ${error.response.data?.error || 'Unknown error'}`);
+      } else {
+        console.error(`   - Error: ${error.message}`);
+      }
+    }
+  });
+
+auditCommand
+  .command('export')
+  .description('Export audit logs')
+  .option('--format <format>', 'Export format (e.g., json, csv)', 'json')
+  .option('--out <file>', 'Output file to save the export')
+  .action(async (options) => {
+    const { server, token } = await getApiConfig(program.opts());
+    if (!token) {
+      console.error('❌ You are not logged in. Please run `login` first or provide a --token.');
+      return;
+    }
+
+    try {
+      const params = new URLSearchParams();
+      if (options.format) params.append('format', options.format);
+
+      const response = await axios.get(`${server}/api/audit/export`, {
+        params,
+        headers: { Authorization: `Bearer ${token}` },
+        responseType: options.out ? 'stream' : 'json',
+      });
+
+      if (response.status === 200) {
+        if (options.out) {
+          response.data.pipe(fs.createWriteStream(options.out));
+          console.log(`✅ Audit log export started and will be saved to ${options.out}`);
+        } else {
+          console.log(JSON.stringify(response.data, null, 2));
+        }
+      } else {
+        console.error(`❌ Failed to export audit logs. Server responded with status ${response.status}`);
+      }
+    } catch (error: any) {
+      console.error('❌ Failed to export audit logs.');
+      if (error.response) {
+        console.error(`   - Status: ${error.response.status}`);
+        console.error(`   - Error: ${error.response.data?.error || 'Unknown error'}`);
+      } else {
+        console.error(`   - Error: ${error.message}`);
+      }
+    }
+  });
+
 program.parse(process.argv);
