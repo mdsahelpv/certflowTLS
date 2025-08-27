@@ -343,7 +343,8 @@ export class CAService {
     }
 
     if (certificate.status === CertificateStatus.REVOKED) {
-      throw new Error('Certificate is already revoked');
+      // Idempotent: already revoked
+      return;
     }
 
     // Update certificate status
@@ -357,19 +358,34 @@ export class CAService {
     });
 
     // Create revocation record
-    await db.certificateRevocation.create({
-      data: {
-        certificateId: certificate.id,
-        serialNumber,
-        revocationReason: reason as any,
-        revokedById,
-      },
-    });
+    // Ensure revokedById exists to avoid FK violations
+    let revokedByIdSafe: string | undefined = revokedById;
+    try {
+      if (revokedById) {
+        const user = await db.user.findUnique({ where: { id: revokedById } });
+        if (!user) revokedByIdSafe = undefined;
+      }
+    } catch {
+      revokedByIdSafe = undefined;
+    }
+
+    try {
+      await db.certificateRevocation.create({
+        data: {
+          certificateId: certificate.id,
+          serialNumber,
+          revocationReason: reason as any,
+          revokedById: revokedByIdSafe,
+        },
+      });
+    } catch (e: any) {
+      // Ignore unique/FK races: if a record already exists or user FK fails, proceed as revoked
+    }
 
     // Log audit event
     await AuditService.log({
       action: 'CERTIFICATE_REVOKED',
-      userId: revokedById,
+      userId: revokedByIdSafe,
       description: `Certificate ${serialNumber} revoked`,
       metadata: {
         serialNumber,
