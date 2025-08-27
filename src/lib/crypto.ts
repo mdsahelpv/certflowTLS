@@ -181,20 +181,16 @@ import * as pkijs from 'pkijs';
 export class CRLUtils {
   private static ensurePkijsEngine(): void {
     try {
-      const current = (pkijs as any).getCrypto?.();
-      if (!current) {
-        const nodeCrypto: any = (require('crypto') as any).webcrypto;
-        if (nodeCrypto) {
-          const engine = new (pkijs as any).CryptoEngine({
-            name: 'nodeEngine',
-            crypto: nodeCrypto,
-            subtle: nodeCrypto.subtle,
-          });
-          (pkijs as any).setEngine('nodeEngine', nodeCrypto, engine);
-        }
-      }
+      const globalCrypto: any = (globalThis as any).crypto || (require('crypto') as any).webcrypto;
+      if (!globalCrypto) return;
+      const engine = new (pkijs as any).CryptoEngine({
+        name: 'webcrypto',
+        crypto: globalCrypto,
+        subtle: globalCrypto.subtle,
+      });
+      (pkijs as any).setEngine('webcrypto', globalCrypto, engine);
     } catch {
-      // ignore; pkijs may already be configured
+      // ignore; pkijs may already be configured or crypto unavailable
     }
   }
   static async generateCRL(
