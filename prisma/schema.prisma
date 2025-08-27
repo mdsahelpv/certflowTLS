@@ -68,6 +68,8 @@ model CAConfig {
   crlDistributionPoint String?
   ocspUrl            String?
   createdAt           DateTime  @default(now())
+  crlLifetimeDays       Int     @default(7)
+  deltaCrlLifetimeHours Int     @default(1)
   updatedAt           DateTime  @updatedAt
 
   // Relations

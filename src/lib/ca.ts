@@ -343,8 +343,7 @@ export class CAService {
     }
 
     if (certificate.status === CertificateStatus.REVOKED) {
-      // Idempotent: already revoked
-      return;
+      throw new Error('Certificate is already revoked');
     }
 
     // Update certificate status
@@ -407,19 +406,42 @@ export class CAService {
         throw new Error('CA is not active');
       }
 
-    // Get revoked certificates for this CA
-    const revocations = await db.certificateRevocation.findMany({
-      include: {
-        certificate: true,
-      },
-      where: { certificate: { caId: caConfig.id } as any },
-    });
+    // Get revoked certificates for this CA in batches to avoid memory issues
+    const revokedCertificates: Array<{
+      serialNumber: string;
+      revocationDate: Date;
+      reason: string;
+    }> = [];
+    const pageSize = 1000;
+    let cursor: string | undefined;
 
-    const revokedCertificates = revocations.map(rev => ({
-      serialNumber: rev.serialNumber,
-      revocationDate: rev.revocationDate,
-      reason: rev.revocationReason,
-    }));
+    while (true) {
+      const revocationPage = await db.certificateRevocation.findMany({
+        take: pageSize,
+        skip: cursor ? 1 : 0,
+        cursor: cursor ? { id: cursor } : undefined,
+        where: { certificate: { caId: caConfig.id } as any },
+        orderBy: { id: 'asc' },
+      });
+
+      if (revocationPage.length === 0) {
+        break;
+      }
+
+      for (const rev of revocationPage) {
+        revokedCertificates.push({
+          serialNumber: rev.serialNumber,
+          revocationDate: rev.revocationDate,
+          reason: rev.revocationReason,
+        });
+      }
+
+      if (revocationPage.length < pageSize) {
+        break;
+      }
+
+      cursor = revocationPage[revocationPage.length - 1].id;
+    }
 
     // Decrypt CA private key
     const encryptedKey = JSON.parse(caConfig.privateKey);
@@ -431,12 +453,14 @@ export class CAService {
     }
 
     // Generate CRL with enhanced extensions
+    const lifetimeMs = (caConfig.crlLifetimeDays || 7) * 24 * 60 * 60 * 1000;
+    const nextUpdate = new Date(Date.now() + lifetimeMs);
     const crl = await CRLUtils.generateCRL(
       revokedCertificates,
       caConfig.subjectDN,
       caPrivateKey,
       caConfig.certificate,
-      new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
+      nextUpdate,
       caConfig.crlNumber + 1
     );
 
@@ -452,7 +476,7 @@ export class CAService {
       data: {
         crlNumber: newCrlNumber,
         crlData: crl,
-        nextUpdate: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
+        nextUpdate,
         ca: { connect: { id: caConfig.id } },
       },
     });
@@ -513,29 +537,51 @@ export class CAService {
       throw new Error('No base CRL found for delta CRL generation');
     }
 
-    // Get certificates revoked since the last full CRL
+    // Get certificates revoked since the last full CRL in batches
     const lastRevocationDate = lastFullCRL.issuedAt;
-    const recentRevocations = await db.certificateRevocation.findMany({
-      where: {
-        revocationDate: {
-          gt: lastRevocationDate,
-        },
-        certificate: { caId: caConfig.id } as any,
-      },
-      include: {
-        certificate: true,
-      },
-    });
+    const revokedCertificates: Array<{
+      serialNumber: string;
+      revocationDate: Date;
+      reason: string;
+    }> = [];
+    const pageSize = 1000;
+    let cursor: string | undefined;
 
-    if (recentRevocations.length === 0) {
-      throw new Error('No new revocations since last full CRL');
+    while (true) {
+      const recentRevocations = await db.certificateRevocation.findMany({
+        take: pageSize,
+        skip: cursor ? 1 : 0,
+        cursor: cursor ? { id: cursor } : undefined,
+        where: {
+          revocationDate: {
+            gt: lastRevocationDate,
+          },
+          certificate: { caId: caConfig.id } as any,
+        },
+        orderBy: { id: 'asc' },
+      });
+
+      if (recentRevocations.length === 0) {
+        break;
+      }
+
+      for (const rev of recentRevocations) {
+        revokedCertificates.push({
+          serialNumber: rev.serialNumber,
+          revocationDate: rev.revocationDate,
+          reason: rev.revocationReason,
+        });
+      }
+
+      if (recentRevocations.length < pageSize) {
+        break;
+      }
+      cursor = recentRevocations[recentRevocations.length - 1].id;
     }
 
-    const revokedCertificates = recentRevocations.map(rev => ({
-      serialNumber: rev.serialNumber,
-      revocationDate: rev.revocationDate,
-      reason: rev.revocationReason,
-    }));
+    if (revokedCertificates.length === 0) {
+      throw new Error('No new revocations since last full CRL');
+    }
 
     // Decrypt CA private key
     const encryptedKey = JSON.parse(caConfig.privateKey);
@@ -547,12 +593,14 @@ export class CAService {
     }
 
     // Generate Delta CRL
+    const lifetimeMs = (caConfig.deltaCrlLifetimeHours || 1) * 60 * 60 * 1000;
+    const nextUpdate = new Date(Date.now() + lifetimeMs);
     const deltaCRL = await CRLUtils.generateDeltaCRL(
       revokedCertificates,
       caConfig.subjectDN,
       caPrivateKey,
       caConfig.certificate,
-      new Date(Date.now() + 6 * 60 * 60 * 1000), // 6 hours for delta CRL
+      nextUpdate,
       lastFullCRL.crlNumber,
       caConfig.crlNumber + 1,
     );
@@ -569,7 +617,7 @@ export class CAService {
       data: {
         crlNumber: newCrlNumber,
         crlData: deltaCRL,
-        nextUpdate: new Date(Date.now() + 6 * 60 * 60 * 1000), // 6 hours
+        nextUpdate,
         ca: { connect: { id: caConfig.id } },
       },
     });
@@ -591,44 +639,45 @@ export class CAService {
     return deltaCRL;
   }
 
-  // Validate CRL extensions and compliance
+  // Validate CRL signature, extensions, and compliance
   static async validateCRL(crlPem: string): Promise<{
     isValid: boolean;
     issues: string[];
-    info: {
-      issuer: string;
-      thisUpdate: Date;
-      nextUpdate: Date;
-      revokedCount: number;
-      crlNumber?: number;
-      isDeltaCRL: boolean;
-      deltaCRLIndicator?: number;
-      extensions: string[];
-    };
+    info: any;
   }> {
+    let info: any;
     try {
-      const validation = CRLUtils.validateCRLExtensions(crlPem);
-      const info = CRLUtils.getCRLInfo(crlPem);
-
-      return {
-        isValid: validation.isValid,
-        issues: validation.issues,
-        info,
-      };
+      info = CRLUtils.getCRLInfo(crlPem);
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
       return {
         isValid: false,
-        issues: [`Failed to validate CRL: ${error instanceof Error ? error.message : String(error)}`],
-        info: {
-          issuer: 'Unknown',
-          thisUpdate: new Date(),
-          nextUpdate: new Date(),
-          revokedCount: 0,
-          extensions: [],
-          isDeltaCRL: false,
-        },
+        issues: [`Failed to parse CRL: ${message}`],
+        info: { issuer: 'Unknown', thisUpdate: new Date(), nextUpdate: new Date(), revokedCount: 0, extensions: [], isDeltaCRL: false },
       };
     }
+
+    // Find the issuer CA from the database using the subjectDN from the CRL
+    const issuerCA = await db.cAConfig.findFirst({
+      where: { subjectDN: info.issuer },
+    });
+
+    if (!issuerCA || !issuerCA.certificate) {
+      return {
+        isValid: false,
+        issues: [`Issuer CA with subject '${info.issuer}' not found in the database or has no certificate.`],
+        info,
+      };
+    }
+
+    // Perform full validation using the found issuer certificate
+    const validation = await CRLUtils.validateCRL(crlPem, issuerCA.certificate);
+
+    return {
+      isValid: validation.isValid,
+      issues: validation.issues,
+      info,
+    };
   }
 
   // Get CRL statistics and information

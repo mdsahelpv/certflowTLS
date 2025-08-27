@@ -31,6 +31,9 @@ jest.mock('@/lib/db', () => ({
       create: jest.fn(),
       findMany: jest.fn(),
     },
+    user: {
+      findUnique: jest.fn(),
+    },
     $transaction: jest.fn(),
   },
 }));
@@ -503,6 +506,7 @@ describe('CAService', () => {
 
       mockedDb.certificate.findUnique.mockResolvedValue(mockCertificate);
       mockedDb.cAConfig.findUnique.mockResolvedValue(mockCA);
+      mockedDb.user.findUnique.mockResolvedValue({ id: userId, name: 'Test User', username: 'testuser' });
       mockedDb.certificate.update.mockResolvedValue({
         ...mockCertificate,
         status: 'REVOKED',
