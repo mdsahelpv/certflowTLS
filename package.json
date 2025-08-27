@@ -34,6 +34,7 @@
     "test:debug": "node --inspect-brk node_modules/.bin/jest --runInBand",
     "test:update": "jest --updateSnapshot",
     "test:verbose": "jest --verbose",
+    "test:e2e": "playwright test",
     "docker:build": "docker build -t ca-management .",
     "docker:run": "docker run -p 3000:3000 --env-file env.docker ca-management",
     "docker:compose": "docker compose up --build",
@@ -127,6 +128,7 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
+    "@playwright/test": "^1.55.0",
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "^6.8.0",
     "@testing-library/react": "^16.3.0",

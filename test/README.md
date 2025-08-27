@@ -17,6 +17,9 @@ test/
 ├── app/                     # API route tests
 │   └── api/
 │       └── health.test.ts   # Health endpoint tests
+├── e2e/                     # End-to-end tests
+│   ├── global-setup.ts      # Global setup for E2E tests
+│   └── certificate-lifecycle.spec.ts
 └── README.md                # This file
 ```
 
@@ -74,6 +77,25 @@ npm test -- --testNamePattern="should authenticate valid user"
 - **Database Operations**: Prisma operations with test database
 - **API Endpoints**: Full request/response cycle testing
 - **Authentication Flow**: Complete auth workflow testing
+
+### **5. End-to-End Tests (`test/e2e/`)**
+This project uses [Playwright](https://playwright.dev/) for end-to-end (E2E) testing. These tests simulate real user scenarios in a browser and cover the entire application workflow.
+
+**Setup**
+
+The E2E tests require a `.env.test` file in the root of the project. You can copy `env.example` and configure it for testing. The tests will automatically set up a test database and a root CA before running.
+
+**Running E2E Tests**
+```bash
+# Run all E2E tests
+npm run test:e2e
+
+# Run tests in headed mode to watch the browser
+npm run test:e2e -- --headed
+
+# Run a specific E2E test file
+npm run test:e2e -- certificate-lifecycle.spec.ts
+```
 
 ## 🛠️ **Test Utilities**
 
