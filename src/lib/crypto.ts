@@ -986,57 +986,11 @@ export class X509Utils {
     const extensions: any[] = [
       {
         name: 'basicConstraints',
-        value: {
-          cA: true,
-          pathLenConstraint: 0,
-        },
+        value: { cA: true },
         critical: true,
-      },
-      {
-        name: 'keyUsage',
-        value: {
-          keyCertSign: true,
-          cRLSign: true,
-        },
-        critical: true,
-      },
-      {
-        name: 'subjectKeyIdentifier',
-        value: this.getSubjectKeyIdentifierFromCSR(csr),
-        critical: false,
-      },
-      // Authority Key Identifier for self-signed certs is the same as Subject Key Identifier
-      {
-        name: 'authorityKeyIdentifier',
-        value: { keyIdentifier: this.getSubjectKeyIdentifierFromCSR(csr) },
-        critical: false,
       },
     ];
-
-    if (opts?.crlDistributionPointUrl) {
-      extensions.push({
-        name: 'cRLDistributionPoints',
-        value: [{
-          distributionPoint: [{ type: 6, value: opts.crlDistributionPointUrl }],
-        }],
-        critical: false
-      });
-    }
-
-    if (opts?.ocspUrl) {
-      extensions.push({
-        name: 'authorityInfoAccess',
-        value: {
-          accessDescriptions: [
-            {
-              accessMethod: '1.3.6.1.5.5.7.48.1', // OCSP
-              accessLocation: { type: 6, value: opts.ocspUrl },
-            },
-          ],
-        },
-        critical: false
-      });
-    }
+    // Minimal extension set: only Basic Constraints to avoid node-forge DER issues in certain runtimes.
 
     cert.setExtensions(extensions);
     cert.sign(privateKey, forge.md.sha256.create());
