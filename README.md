@@ -55,7 +55,6 @@ git clone <your-repo-url> && cd CER
 cp env.sqlite .env && mkdir -p db logs
 npm install && npx prisma generate && npx prisma db push
 export ADMIN_USERNAME=admin ADMIN_PASSWORD=admin123 && node create-admin.js
-npm run init:ca
 npm run dev
 ```
 
@@ -110,33 +109,30 @@ node create-admin.js
 ```
 *Note: You can unset these variables after the script runs with `unset ADMIN_USERNAME ADMIN_PASSWORD`.*
 
-### **6. Set up the Root Certificate Authority (CA)**
-Before you can issue certificates, you must create the initial root CA. A helper script is provided for this.
+### **6. Root Certificate Authority (CA) in Development**
+On first startup, if no CA exists in the database, the application automatically creates a demo, self‑signed CA and marks it ACTIVE. This lets you immediately test issuing, revoking, and CRL/OCSP features without manual steps.
+
+**Default Dev CA (auto-created on first run)**
+- **Name**: Demo CA
+- **Algorithm**: RSA‑2048 (configurable)
+- **Validity**: 10 years (configurable)
+- **CRL URL**: http://localhost:3000/api/crl/download/latest
+- **OCSP URL**: http://localhost:3000/api/ocsp
+
+You can disable auto-creation by setting `DEMO_CA_AUTO_INIT=false` before starting.
+
+If you prefer a manual flow:
+- Use the UI at `/ca/setup` to initialize a CA (CSR) and upload its signed certificate, or
+- Use the API to create a self‑signed CA in one step:
 ```bash
-npm run init:ca
+curl -X POST http://localhost:3000/api/ca/self-signed \
+  -H 'content-type: application/json' \
+  -d '{
+    "subjectDN":"C=US,ST=CA,L=SF,O=Demo,OU=IT,CN=Demo Root CA",
+    "keyAlgorithm":"RSA","keySize":2048,"validityDays":3650,
+    "force":false
+  }'
 ```
-
-**Force overwrite existing CA** (if needed):
-```bash
-npm run init:ca:force
-```
-
-This script will:
-- Create a self-signed root CA certificate (RSA-4096)
-- Generate and store the CA private key (encrypted)
-- Set up CA configuration with CRL and OCSP endpoints
-- Create an admin user (admin/admin123) if it doesn't exist
-- Log the initialization in the audit system
-
-**Note**: If you see "CA already exists in database", that's fine - the system is already initialized. Use `--force` to overwrite.
-
-**Default CA Details**:
-- **Name**: Development CA
-- **Algorithm**: RSA-4096
-- **Validity**: 10 years
-- **Admin User**: admin/admin123
-- **CRL URL**: http://localhost:3000/api/crl/latest
-- **OCSP URL**: http://localhost:3000/api/ocsp/binary
 
 ### **7. Run the Application**
 You can now start the development server.
