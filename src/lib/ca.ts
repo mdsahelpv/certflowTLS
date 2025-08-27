@@ -27,6 +27,63 @@ export interface CertificateData {
 }
 
 export class CAService {
+  static async createSelfSignedCA(config: CAConfigData & { validityDays?: number; force?: boolean }): Promise<{ id: string; certificate: string }>{
+    // If CA exists and not force, reject
+    const existing = await db.cAConfig.findFirst();
+    if (existing && !config.force) {
+      throw new Error('A CA already exists. Use force=true to overwrite.');
+    }
+
+    if (existing && config.force) {
+      await db.$transaction(async (tx) => {
+        await tx.certificateRevocation.deleteMany({ where: { certificate: { caId: existing.id } as any } });
+        await tx.certificate.deleteMany({ where: { caId: existing.id } });
+        await tx.cRL.deleteMany({ where: { caId: existing.id } });
+        await tx.cAConfig.delete({ where: { id: existing.id } });
+      });
+    }
+
+    const keyPair = CSRUtils.generateKeyPair(config.keyAlgorithm, config.keySize, config.curve);
+    const subject = CertificateUtils.parseDN(config.subjectDN);
+    const csr = CSRUtils.generateCSR(subject, keyPair.privateKey, keyPair.publicKey);
+    const validityDays = Number(config.validityDays || process.env.DEMO_CA_VALIDITY_DAYS || 3650);
+    const crlUrl = process.env.CRL_DISTRIBUTION_POINT || 'http://localhost:3000/api/crl/download/latest';
+    const ocspUrl = process.env.OCSP_URL || 'http://localhost:3000/api/ocsp';
+
+    const certificate = X509Utils.selfSignCSR(csr, keyPair.privateKey, validityDays, {
+      crlDistributionPointUrl: crlUrl,
+      ocspUrl,
+    });
+
+    const { notBefore, notAfter } = X509Utils.parseCertificateDates(certificate);
+    const encrypted = Encryption.encrypt(keyPair.privateKey);
+
+    const ca = await db.cAConfig.create({
+      data: {
+        name: (config as any).name || 'API Self-Signed CA',
+        subjectDN: config.subjectDN,
+        privateKey: JSON.stringify(encrypted),
+        csr,
+        certificate,
+        keyAlgorithm: config.keyAlgorithm,
+        keySize: config.keySize,
+        curve: config.curve,
+        status: CAStatus.ACTIVE,
+        validFrom: notBefore,
+        validTo: notAfter,
+        crlDistributionPoint: crlUrl,
+        ocspUrl,
+      },
+    });
+
+    await AuditService.log({
+      action: 'CA_CERTIFICATE_UPLOADED',
+      description: 'Self-signed CA created via API',
+      metadata: { caId: ca.id, subjectDN: config.subjectDN },
+    });
+
+    return { id: ca.id, certificate };
+  }
   static async initializeCA(config: CAConfigData): Promise<{
     caId: string;
     csr: string;
