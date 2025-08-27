@@ -7,15 +7,14 @@
  * It creates a self-signed CA certificate and stores it in the database.
  * 
  * Usage:
- *   node scripts/init-ca.js
+ *   npx tsx scripts/init-ca.js
  *   npm run init:ca
  */
 
-const { PrismaClient } = require('@prisma/client');
-const { CAService } = require('../src/lib/ca');
-const { Encryption } = require('../src/lib/crypto');
-const bcrypt = require('bcryptjs');
-require('dotenv/config');
+import { PrismaClient } from '@prisma/client';
+import { Encryption } from '../src/lib/crypto';
+import bcrypt from 'bcryptjs';
+import 'dotenv/config';
 
 const prisma = new PrismaClient();
 
@@ -46,67 +45,35 @@ async function initializeCA() {
 
     // Generate CA key pair
     console.log('🔑 Generating CA key pair...');
-    const { generateKeyPair } = require('../src/lib/crypto');
-    const keyPair = generateKeyPair('RSA', 4096);
+    const { CSRUtils, X509Utils } = await import('../src/lib/crypto');
+    const keyPair = CSRUtils.generateKeyPair('RSA', 4096);
     
     // Create CA configuration
     console.log('📝 Creating CA configuration...');
     const caConfig = await prisma.cAConfig.create({
       data: {
         name: 'Development CA',
-        status: 'INITIALIZED',
+        status: 'INITIALIZING',
         keyAlgorithm: 'RSA',
         keySize: 4096,
-        validityDays: 3650, // 10 years
-        pathLenConstraint: 0,
-        crlDistributionPointUrl: process.env.CRL_DISTRIBUTION_POINT_URL || 'http://localhost:3000/api/crl/latest',
+        subjectDN: 'CN=Development Root CA,OU=Development CA,O=Development Organization,L=San Francisco,ST=California,C=US',
+        privateKey: 'placeholder', // Will be updated with actual encrypted key
+        crlDistributionPoint: process.env.CRL_DISTRIBUTION_POINT_URL || 'http://localhost:3000/api/crl/latest',
         ocspUrl: process.env.OCSP_URL || 'http://localhost:3000/api/ocsp/binary',
-        createdById: 'system',
       },
     });
 
-    // Generate self-signed CA certificate
-    console.log('📜 Generating self-signed CA certificate...');
-    const { selfSignCSR } = require('../src/lib/crypto');
-    
-    // Create CSR for CA
-    const { generateCSR } = require('../src/lib/crypto');
-    const csr = generateCSR(
-      {
-        C: 'US',
-        ST: 'California',
-        L: 'San Francisco',
-        O: 'Development Organization',
-        OU: 'Development CA',
-        CN: 'Development Root CA',
-      },
-      keyPair.privateKey,
-      keyPair.publicKey
-    );
-
-    // Self-sign the CSR to create CA certificate
-    const caCertificate = selfSignCSR(
-      csr,
-      keyPair.privateKey,
-      3650, // 10 years
-      {
-        crlDistributionPointUrl: process.env.CRL_DISTRIBUTION_POINT_URL || 'http://localhost:3000/api/crl/latest',
-        ocspUrl: process.env.OCSP_URL || 'http://localhost:3000/api/ocsp/binary',
-      }
-    );
-
-    // Encrypt private key
+    // For now, just store the encrypted private key
+    // Certificate generation will be handled by the CA setup UI
+    console.log('💾 Storing encrypted private key...');
     const encryptedPrivateKey = Encryption.encrypt(keyPair.privateKey);
-
-    // Update CA configuration with certificate and encrypted private key
-    console.log('💾 Storing CA certificate and private key...');
+    
+    // Update CA configuration with encrypted private key
     await prisma.cAConfig.update({
       where: { id: caConfig.id },
       data: {
-        certificate: caCertificate,
-        privateKey: encryptedPrivateKey,
-        status: 'ACTIVE',
-        activatedAt: new Date(),
+        privateKey: JSON.stringify(encryptedPrivateKey),
+        status: 'INITIALIZING', // Keep as INITIALIZING until certificate is generated
       },
     });
 
@@ -128,7 +95,7 @@ async function initializeCA() {
     // Log the initialization
     await prisma.auditLog.create({
       data: {
-        action: 'CA_INITIALIZED',
+        action: 'CONFIG_UPDATED',
         userId: adminUser.id,
         description: 'Certificate Authority initialized for development',
         ipAddress: '127.0.0.1',
@@ -146,10 +113,10 @@ async function initializeCA() {
     console.log('\n📊 CA Details:');
     console.log(`   - ID: ${caConfig.id}`);
     console.log(`   - Name: ${caConfig.name}`);
-    console.log(`   - Status: ACTIVE`);
+    console.log(`   - Status: INITIALIZING (Ready for certificate generation)`);
     console.log(`   - Key Algorithm: RSA-4096`);
-    console.log(`   - Validity: 10 years`);
-    console.log(`   - CRL URL: ${caConfig.crlDistributionPointUrl}`);
+    console.log(`   - Private Key: Encrypted and stored`);
+    console.log(`   - CRL URL: ${caConfig.crlDistributionPoint}`);
     console.log(`   - OCSP URL: ${caConfig.ocspUrl}`);
     
     console.log('\n👤 Admin User:');
@@ -157,17 +124,13 @@ async function initializeCA() {
     console.log(`   - Password: admin123`);
     console.log(`   - Role: ADMIN`);
     
-    console.log('\n🔗 Access URLs:');
-    console.log(`   - CA Status: http://localhost:3000/ca/status`);
-    console.log(`   - CA Setup: http://localhost:3000/ca/setup`);
-    console.log(`   - Issue Certificate: http://localhost:3000/certificates/issue`);
-    console.log(`   - Login: http://localhost:3000/auth/signin`);
-    
-    console.log('\n🚀 You can now:');
-    console.log('   1. Start the application: npm run dev');
-    console.log('   2. Login with admin/admin123');
-    console.log('   3. Issue certificates using the CA');
-    console.log('   4. Generate CRLs and handle OCSP requests');
+    console.log('\n🔗 Next Steps:');
+    console.log(`   1. Start the application: npm run dev`);
+    console.log(`   2. Login with admin/admin123`);
+    console.log(`   3. Go to CA Setup: http://localhost:3000/ca/setup`);
+    console.log(`   4. Generate the CA certificate using the UI`);
+    console.log(`   5. Once certificate is generated, CA will be ACTIVE`);
+    console.log(`   6. You can then issue certificates`);
 
   } catch (error) {
     console.error('\n❌ CA Initialization Failed:', error.message);
@@ -186,4 +149,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { initializeCA };
+export { initializeCA };
