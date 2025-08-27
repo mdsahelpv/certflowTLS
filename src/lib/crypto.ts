@@ -1012,31 +1012,9 @@ export class X509Utils {
         critical: false,
       },
     ];
-
-    if (opts?.crlDistributionPointUrl) {
-      extensions.push({
-        name: 'cRLDistributionPoints',
-        value: [{
-          distributionPoint: [{ type: 6, value: opts.crlDistributionPointUrl }],
-        }],
-        critical: false
-      });
-    }
-
-    if (opts?.ocspUrl) {
-      extensions.push({
-        name: 'authorityInfoAccess',
-        value: {
-          accessDescriptions: [
-            {
-              accessMethod: '1.3.6.1.5.5.7.48.1', // OCSP
-              accessLocation: { type: 6, value: opts.ocspUrl },
-            },
-          ],
-        },
-        critical: false
-      });
-    }
+    // Note: For maximum compatibility across environments (including edge/runtime bundlers),
+    // we omit CRL Distribution Points and Authority Info Access on the self-signed root.
+    // These can be added later via a dedicated certificate management flow if needed.
 
     cert.setExtensions(extensions);
     cert.sign(privateKey, forge.md.sha256.create());
