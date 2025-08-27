@@ -30,6 +30,10 @@ export interface CertificateValidationResult {
   };
   lastValidated: Date;
   cached?: boolean;
+  extensions?: {
+    crlDistributionPoints?: string[];
+    ocspUrls?: string[];
+  };
 }
 
 export interface ValidationOptions {
@@ -145,15 +149,46 @@ export class CertificateValidationService {
         chainValidation.issues.push(...additionalValidation.issues);
       }
 
+      // Filter issues to emphasize end-entity problems only (hide repeated issuer extension warnings)
+      const filteredIssues = (chainValidation.issues || []).filter((msg) => !msg.startsWith('Issuer '));
+
+      // Extract CRL and OCSP URLs from the end-entity certificate (best-effort)
+      let crlDps: string[] = [];
+      let ocspUrls: string[] = [];
+      try {
+        const cert = forge.pki.certificateFromPem(certificatePem);
+        const crlExt: any = cert.getExtension('cRLDistributionPoints');
+        if (crlExt) {
+          const json = JSON.stringify(crlExt);
+          const matches = json.match(/https?:\/\/[^"\\\s]+/g);
+          if (matches) crlDps = Array.from(new Set(matches));
+        }
+        const aia: any = cert.getExtension('authorityInfoAccess');
+        if (aia && Array.isArray(aia.accessDescriptions)) {
+          ocspUrls = aia.accessDescriptions
+            .filter((d: any) => d?.accessMethod === '1.3.6.1.5.5.7.48.1')
+            .map((d: any) => d?.accessLocation?.value)
+            .filter((v: any) => typeof v === 'string');
+        } else if (aia) {
+          const s = JSON.stringify(aia);
+          const ocsp = s.match(/https?:\/\/[^"\\\s]+/g);
+          if (ocsp) ocspUrls = Array.from(new Set(ocsp));
+        }
+      } catch {}
+
       const result: CertificateValidationResult = {
         isValid: chainValidation.isValid && !expiration.expired && signature.verified,
-        issues: chainValidation.issues,
+        issues: filteredIssues,
         chain: chainValidation.chain,
         chainInfo,
         expiration,
         signature,
         lastValidated: new Date(),
-        cached: false
+        cached: false,
+        extensions: {
+          crlDistributionPoints: crlDps,
+          ocspUrls,
+        }
       };
 
       // Cache the result

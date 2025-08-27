@@ -46,6 +46,10 @@ interface ValidationResult {
   };
   lastValidated: Date | string;
   cached: boolean;
+  extensions?: {
+    crlDistributionPoints?: string[];
+    ocspUrls?: string[];
+  };
 }
 
 export default function CertificateValidationPage() {
@@ -522,6 +526,22 @@ export default function CertificateValidationPage() {
                       <span>Issuer:</span>
                       <span className="font-mono">{validationResult.signature.issuer}</span>
                     </div>
+                    {(validationResult.extensions?.crlDistributionPoints?.length || 0) > 0 && (
+                      <div className="flex items-center justify-between text-sm">
+                        <span>CRL URL:</span>
+                        <span className="font-mono truncate">
+                          {validationResult.extensions!.crlDistributionPoints![0]}
+                        </span>
+                      </div>
+                    )}
+                    {(validationResult.extensions?.ocspUrls?.length || 0) > 0 && (
+                      <div className="flex items-center justify-between text-sm">
+                        <span>OCSP URL:</span>
+                        <span className="font-mono truncate">
+                          {validationResult.extensions!.ocspUrls![0]}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
