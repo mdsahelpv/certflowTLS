@@ -13,17 +13,22 @@ global.clearImmediate = global.clearImmediate || ((id: any) => clearTimeout(id))
 
 // Mock Next.js Request/Response
 global.Request = class MockRequest {
-  url: string;
-  method: string;
-  headers: Headers;
-  body: any;
+  private _url: string;
+  private _method: string;
+  private _headers: Headers;
+  private _body: any;
 
   constructor(input: any, init?: any) {
-    this.url = typeof input === 'string' ? input : input?.url || 'http://localhost:3000';
-    this.method = init?.method || 'GET';
-    this.headers = new Headers(init?.headers || {});
-    this.body = init?.body || null;
+    this._url = typeof input === 'string' ? input : input?.url || 'http://localhost:3000';
+    this._method = init?.method || 'GET';
+    this._headers = new Headers(init?.headers || {});
+    this._body = init?.body || null;
   }
+
+  get url() { return this._url; }
+  get method() { return this._method; }
+  get headers() { return this._headers; }
+  get body() { return this._body; }
 } as any;
 
 global.Response = class MockResponse {

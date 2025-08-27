@@ -22,11 +22,11 @@ async function globalSetup() {
     const adminPassword = bcrypt.hashSync('password', 10);
     await prisma.user.upsert({
       where: { username: 'admin' },
-      update: { passwordHash: adminPassword },
+      update: { password: adminPassword },
       create: {
         username: 'admin',
         email: 'admin@test.com',
-        passwordHash: adminPassword,
+        password: adminPassword,
         role: 'ADMIN',
         status: 'ACTIVE',
         name: 'Test Admin',
@@ -37,11 +37,11 @@ async function globalSetup() {
     const operatorPassword = bcrypt.hashSync('password', 10);
     await prisma.user.upsert({
       where: { username: 'operator' },
-      update: { passwordHash: operatorPassword },
+      update: { password: operatorPassword },
       create: {
         username: 'operator',
         email: 'operator@test.com',
-        passwordHash: operatorPassword,
+        password: operatorPassword,
         role: 'OPERATOR',
         status: 'ACTIVE',
         name: 'Test Operator',
@@ -52,11 +52,11 @@ async function globalSetup() {
     const viewerPassword = bcrypt.hashSync('password', 10);
     await prisma.user.upsert({
       where: { username: 'viewer' },
-      update: { passwordHash: viewerPassword },
+      update: { password: viewerPassword },
       create: {
         username: 'viewer',
         email: 'viewer@test.com',
-        passwordHash: viewerPassword,
+        password: viewerPassword,
         role: 'VIEWER',
         status: 'ACTIVE',
         name: 'Test Viewer',
@@ -67,11 +67,11 @@ async function globalSetup() {
     const inactivePassword = bcrypt.hashSync('password', 10);
     await prisma.user.upsert({
       where: { username: 'inactive' },
-      update: { passwordHash: inactivePassword },
+      update: { password: inactivePassword },
       create: {
         username: 'inactive',
         email: 'inactive@test.com',
-        passwordHash: inactivePassword,
+        password: inactivePassword,
         role: 'VIEWER',
         status: 'INACTIVE',
         name: 'Test Inactive User',
