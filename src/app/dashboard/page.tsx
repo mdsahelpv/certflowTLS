@@ -70,6 +70,8 @@ export default function DashboardPage() {
   const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
   const [systemHealth, setSystemHealth] = useState<SystemHealth | null>(null);
   const [isDataLoading, setIsDataLoading] = useState(true);
+  const [isCreatingDemo, setIsCreatingDemo] = useState(false);
+  const [demoError, setDemoError] = useState<string | null>(null);
 
   useEffect(() => {
     if (isAuthenticated && session) {
@@ -111,6 +113,33 @@ export default function DashboardPage() {
       console.error('Failed to fetch dashboard data:', error);
     } finally {
       setIsDataLoading(false);
+    }
+  };
+
+  const handleInitializeDemoCA = async () => {
+    try {
+      setIsCreatingDemo(true);
+      setDemoError(null);
+      const res = await fetch('/api/ca/self-signed', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          subjectDN: 'C=US,ST=California,L=San Francisco,O=Demo Organization,OU=Demo CA,CN=Demo Root CA',
+          keyAlgorithm: 'RSA',
+          keySize: 2048,
+          validityDays: 3650,
+          force: false,
+        })
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to initialize demo CA');
+      }
+      await fetchDashboardData();
+    } catch (e: any) {
+      setDemoError(e?.message || 'Failed to initialize demo CA');
+    } finally {
+      setIsCreatingDemo(false);
     }
   };
 
@@ -365,11 +394,25 @@ export default function DashboardPage() {
                   <p className="text-sm text-orange-700 dark:text-orange-300 mb-3">
                     You need to initialize a Certificate Authority before issuing certificates.
                   </p>
-                  <Link href="/ca/setup">
-                    <Button size="sm" className="bg-orange-600 hover:bg-orange-700 text-white">
-                      Initialize CA
+                  <div className="flex items-center gap-3">
+                    <Link href="/ca/setup">
+                      <Button size="sm" className="bg-orange-600 hover:bg-orange-700 text-white">
+                        Initialize CA
+                      </Button>
+                    </Link>
+                    <Button size="sm" variant="outline" disabled={isCreatingDemo} onClick={handleInitializeDemoCA}>
+                      {isCreatingDemo ? (
+                        <>
+                          <RefreshCw className="h-4 w-4 mr-1 animate-spin" /> Initializing Demo CA...
+                        </>
+                      ) : (
+                        'Initialize Demo CA'
+                      )}
                     </Button>
-                  </Link>
+                  </div>
+                  {demoError && (
+                    <p className="text-sm text-red-600 mt-2">{demoError}</p>
+                  )}
                 </div>
               </CardContent>
             </Card>
