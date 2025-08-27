@@ -1,12 +1,11 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { getApiSession } from '@/lib/api-auth';
 import { CAService } from '@/lib/ca';
 import { CertificateType, CertificateStatus } from '@prisma/client';
 
 export async function GET(request: Request) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getApiSession(request);
     
     if (!session) {
       return NextResponse.json(
