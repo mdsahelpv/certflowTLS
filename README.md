@@ -42,6 +42,23 @@ An enterprise-grade subordinate CA manager to issue, renew, revoke, and export c
 
 This guide provides a linear, step-by-step process for setting up a local development environment using SQLite.
 
+### **🚀 Quick Start (For Experienced Developers)**
+```bash
+# Clone and setup
+git clone <your-repo-url> && cd CER
+
+# Create missing env.sqlite if it doesn't exist
+[ ! -f env.sqlite ] && cp env.example env.sqlite
+
+# Setup environment and start
+cp env.sqlite .env && mkdir -p db logs
+npm install && npx prisma generate && npx prisma db push
+export ADMIN_USERNAME=admin ADMIN_PASSWORD=admin123 && node create-admin.js
+npm run dev
+```
+
+**Login**: admin/admin123 | **URL**: http://localhost:3000
+
 ### **1. Clone the Repository**
 ```bash
 git clone <your-repo-url>
@@ -49,10 +66,22 @@ cd CER
 ```
 
 ### **2. Configure the Environment**
-Copy the SQLite environment template to a new `.env` file. This file is where all local configuration is stored.
+**CRITICAL**: The `env.sqlite` file is required for development but may be missing from the main branch. If it doesn't exist, create it first:
+
+```bash
+# Check if env.sqlite exists
+ls -la env.sqlite
+
+# If it doesn't exist, create it from env.example
+cp env.example env.sqlite
+# Then edit env.sqlite to set DATABASE_URL="file:./db/custom.db"
+```
+
+Now copy the SQLite environment template to a new `.env` file:
 ```bash
 cp env.sqlite .env
 ```
+
 **Important**: Open the `.env` file and ensure the `DATABASE_URL` is set correctly. You should also change the default `NEXTAUTH_SECRET` and `ENCRYPTION_KEY` for security.
 
 ### **3. Install Dependencies**
@@ -61,13 +90,13 @@ npm install
 ```
 
 ### **4. Set up the Database**
-This project supports multiple database backends. For a local SQLite setup, you must first copy the SQLite schema to make it the default for Prisma.
+**IMPORTANT**: The Prisma schema is already configured for SQLite, so you don't need to copy any schema files.
+
+Create the database directory and push the schema:
 ```bash
-cp prisma/schema.sqlite prisma/schema.prisma
-```
-Now, run the database migration to create the necessary tables. This command reads your `.env` file.
-```bash
-npx prisma migrate dev --name init
+mkdir -p db logs
+npx prisma generate
+npx prisma db push
 ```
 
 ### **5. Create an Admin User**
@@ -86,6 +115,8 @@ npx tsx init-ca.ts
 ```
 This script will create a self-signed root CA and generate the first Certificate Revocation List (CRL). It only needs to be run once.
 
+**Note**: If you see "An active CA already exists", that's fine - the system is already initialized.
+
 ### **7. Run the Application**
 You can now start the development server.
 ```bash
@@ -100,10 +131,12 @@ The application will be available at `http://localhost:3000`. You can log in wit
 - **Production**: Docker & Docker Compose
 
 ### **Environment Files**
-- `env.sqlite` - Development environment (SQLite database)
+- `env.sqlite` - Development environment (SQLite database) - **⚠️ May be missing from main branch**
 - `env.docker` - Production environment (PostgreSQL via Docker)
 - `env.postgresql` - PostgreSQL environment
 - `env.example` - Template with all available options
+
+**Note**: If `env.sqlite` is missing, create it from `env.example` and set `DATABASE_URL="file:./db/custom.db"`.
 
 ### **Required Environment Variables**
 ```bash
@@ -150,6 +183,8 @@ WEBHOOK_MAX_RETRY_DELAY=30000
 ### **Development → Production**
 ```bash
 # Stop development server
+npm run dev  # Ctrl+C to stop
+
 # Copy production environment
 cp env.docker .env
 
@@ -164,6 +199,9 @@ docker compose down
 
 # Copy development environment
 cp env.sqlite .env
+
+# Clean any production build artifacts
+npm run clean
 
 # Start development server
 npm run dev
@@ -231,7 +269,12 @@ npm run setup:postgresql  # Setup PostgreSQL environment
 npm run setup:sqlite      # Setup SQLite environment
 ```
 
-## 🐳 Docker Deployment
+## 🐳 Docker Deployment (Production)
+
+### **Prerequisites for Production**
+- Docker and Docker Compose installed
+- PostgreSQL database (handled automatically by docker-compose.yml)
+- Production environment variables configured
 
 ### **Standard Deployment** (Custom Server + Socket.IO)
 ```bash
@@ -246,6 +289,20 @@ docker compose logs -f
 
 # Stop
 docker compose down
+```
+
+### **Production Environment Setup**
+```bash
+# Copy production environment
+cp env.docker .env
+
+# Edit .env with your production values:
+# - Strong NEXTAUTH_SECRET and ENCRYPTION_KEY
+# - Your domain names for CRL_DISTRIBUTION_POINT and OCSP_URL
+# - Database credentials (already set in env.docker)
+
+# Start production
+docker compose up --build
 ```
 
 ### **Simple Deployment** (Standard Next.js Server - Recommended)
@@ -316,6 +373,25 @@ curl -X POST http://localhost:3000/api/notifications/webhook-deliveries \
 ```
 
 ## 🔧 Troubleshooting
+
+### **Missing Environment File (Most Common Issue)**
+If you get errors about missing environment variables or the app won't start:
+
+```bash
+# Check if env.sqlite exists
+ls -la env.sqlite
+
+# If missing, create it from env.example
+cp env.example env.sqlite
+
+# Edit env.sqlite to set these critical values:
+# DATABASE_URL="file:./db/custom.db"
+# NEXTAUTH_SECRET="your-secret-here"
+# ENCRYPTION_KEY="your-32-char-key"
+
+# Then copy to .env
+cp env.sqlite .env
+```
 
 ### **Port Issues**
 ```bash
