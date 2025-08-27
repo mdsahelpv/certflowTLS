@@ -110,8 +110,8 @@ export class CAService {
         keySize: config.keySize,
         curve: config.curve,
         status: CAStatus.INITIALIZING,
-        crlDistributionPoint: process.env.CRL_DISTRIBUTION_POINT || undefined,
-        ocspUrl: process.env.OCSP_URL || undefined,
+        crlDistributionPoint: process.env.CRL_DISTRIBUTION_POINT || 'http://localhost:3000/api/crl/download/latest',
+        ocspUrl: process.env.OCSP_URL || 'http://localhost:3000/api/ocsp',
       },
     });
 
