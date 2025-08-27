@@ -40,29 +40,36 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { certificatePem, options } = body;
+    const { certificatePem, certificateBinary, format, options } = body || {};
 
-    if (!certificatePem) {
-      return NextResponse.json({ error: 'Certificate PEM is required' }, { status: 400 });
+    let certPemToValidate: string | null = null;
+
+    if (certificatePem && typeof certificatePem === 'string') {
+      const trimmed = certificatePem.trim();
+      if (!/^-----BEGIN CERTIFICATE-----[\s\S]+-----END CERTIFICATE-----$/.test(trimmed)) {
+        return NextResponse.json({ error: 'Invalid certificate format. Please provide a valid PEM certificate.' }, { status: 400 });
+      }
+      if (trimmed.length > 50000) {
+        return NextResponse.json({ error: 'Certificate too large. Maximum size is 50KB.' }, { status: 400 });
+      }
+      certPemToValidate = trimmed;
+    } else if (certificateBinary && typeof certificateBinary === 'string') {
+      try {
+        const buf = Buffer.from(certificateBinary, 'base64');
+        // Convert DER to PEM on the server for validation
+        const forgeLib = await import('node-forge');
+        const asn1 = forgeLib.asn1.fromDer(forgeLib.util.createBuffer(buf as any));
+        const cert = forgeLib.pki.certificateFromAsn1(asn1);
+        certPemToValidate = forgeLib.pki.certificateToPem(cert);
+      } catch (e) {
+        return NextResponse.json({ error: 'Failed to parse binary certificate (DER/PKCS#7 not supported here)' }, { status: 400 });
+      }
+    } else {
+      return NextResponse.json({ error: 'Certificate is required' }, { status: 400 });
     }
 
-    // Basic PEM format validation
-    if (!/^-----BEGIN CERTIFICATE-----[\s\S]+-----END CERTIFICATE-----$/.test(certificatePem.trim())) {
-      return NextResponse.json({ 
-        error: 'Invalid certificate format. Please provide a valid PEM certificate.' 
-      }, { status: 400 });
-    }
-
-    // Size limit check (max 50KB for certificate)
-    if (certificatePem.length > 50000) {
-      return NextResponse.json({ 
-        error: 'Certificate too large. Maximum size is 50KB.' 
-      }, { status: 400 });
-    }
-
-    // Validate certificate with user context
     const result = await CertificateValidationService.validateCertificate(
-      certificatePem.trim(),
+      certPemToValidate,
       options,
       session.user.id,
       session.user.username
