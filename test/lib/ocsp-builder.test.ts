@@ -11,11 +11,7 @@ function makeDummyCA() {
   const attrs = [{ name: 'commonName', value: 'Test CA' }]
   cert.setSubject(attrs)
   cert.setIssuer(attrs)
-  cert.setExtensions([
-    { name: 'basicConstraints', cA: true },
-    { name: 'keyUsage', keyCertSign: true, cRLSign: true },
-    { name: 'subjectKeyIdentifier' }
-  ])
+  cert.setExtensions([{ name: 'basicConstraints', value: { cA: true } }])
   cert.sign(keys.privateKey, forge.md.sha256.create())
   return { certPem: forge.pki.certificateToPem(cert), keyPem: forge.pki.privateKeyToPem(keys.privateKey) }
 }

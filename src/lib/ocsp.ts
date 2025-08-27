@@ -34,14 +34,6 @@ function algoIdentifierSha1() {
 	]);
 }
 
-function algoIdentifierSha256() {
-	// sha256 OID 2.16.840.1.101.3.4.2.1
-	return forge.asn1.create(forge.asn1.Class.UNIVERSAL, forge.asn1.Type.SEQUENCE, true, [
-		forge.asn1.create(forge.asn1.Class.UNIVERSAL, forge.asn1.Type.OID, false, forge.asn1.oidToDer('2.16.840.1.101.3.4.2.1').getBytes()),
-		forge.asn1.create(forge.asn1.Class.UNIVERSAL, forge.asn1.Type.NULL, false, ''),
-	]);
-}
-
 function algoIdentifierSha256WithRSA() {
 	// sha256WithRSAEncryption OID 1.2.840.113549.1.1.11
 	return forge.asn1.create(forge.asn1.Class.UNIVERSAL, forge.asn1.Type.SEQUENCE, true, [
@@ -53,10 +45,10 @@ function algoIdentifierSha256WithRSA() {
 function getIssuerNameAndKeyHashes(issuerCertPem: string) {
 	const cert = forge.pki.certificateFromPem(issuerCertPem);
 	const issuerDer = forge.asn1.toDer(forge.pki.distinguishedNameToAsn1(cert.issuer)).getBytes();
-	const md = forge.md.sha256.create();
-	md.update(issuerDer);
-	const issuerNameHash = md.digest().getBytes();
-	const fp = forge.pki.getPublicKeyFingerprint(cert.publicKey, { md: forge.md.sha256.create(), type: 'SubjectPublicKeyInfo' });
+	const md1 = forge.md.sha1.create();
+	md1.update(issuerDer);
+	const issuerNameHash = md1.digest().getBytes();
+	const fp = forge.pki.getPublicKeyFingerprint(cert.publicKey, { md: forge.md.sha1.create(), type: 'SubjectPublicKeyInfo' });
 	const issuerKeyHash = fp.getBytes ? fp.getBytes() : fp as unknown as string;
 	return { issuerNameHash, issuerKeyHash };
 }
@@ -71,7 +63,7 @@ export function buildBasicOCSPResponseRSA(options: {
 }): Uint8Array {
 	const { issuerNameHash, issuerKeyHash } = getIssuerNameAndKeyHashes(options.issuerCertPem);
 	const certID = forge.asn1.create(forge.asn1.Class.UNIVERSAL, forge.asn1.Type.SEQUENCE, true, [
-		algoIdentifierSha256(),
+		algoIdentifierSha1(),
 		toOctetString(issuerNameHash),
 		toOctetString(issuerKeyHash),
 		toIntegerFromHex(options.serialHex),
