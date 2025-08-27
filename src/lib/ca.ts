@@ -347,17 +347,13 @@ export class CAService {
     }
 
     // Generate CRL with enhanced extensions
-    const crl = CRLUtils.generateCRL(
+    const crl = await CRLUtils.generateCRL(
       revokedCertificates,
       caConfig.subjectDN,
       caPrivateKey,
+      caConfig.certificate,
       new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
-      {
-        crlNumber: caConfig.crlNumber + 1,
-        caCertificatePem: caConfig.certificate,
-        crlDistributionPoint: caConfig.crlDistributionPoint || undefined,
-        authorityInfoAccess: caConfig.ocspUrl || undefined,
-      }
+      caConfig.crlNumber + 1
     );
 
     // Update CRL number
@@ -467,18 +463,14 @@ export class CAService {
     }
 
     // Generate Delta CRL
-    const deltaCRL = CRLUtils.generateDeltaCRL(
+    const deltaCRL = await CRLUtils.generateDeltaCRL(
       revokedCertificates,
       caConfig.subjectDN,
       caPrivateKey,
+      caConfig.certificate,
       new Date(Date.now() + 6 * 60 * 60 * 1000), // 6 hours for delta CRL
       lastFullCRL.crlNumber,
       caConfig.crlNumber + 1,
-      {
-        caCertificatePem: caConfig.certificate,
-        crlDistributionPoint: caConfig.crlDistributionPoint || undefined,
-        authorityInfoAccess: caConfig.ocspUrl || undefined,
-      }
     );
 
     // Update CRL number

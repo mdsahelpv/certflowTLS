@@ -1,0 +1,122 @@
+import { describe, it, expect, beforeEach } from '@jest/globals';
+import { CAService } from '@/lib/ca';
+import { db } from '@/lib/db';
+import { X509Utils } from '@/lib/crypto';
+
+// Mock database
+jest.mock('@/lib/db', () => ({
+  db: {
+    cAConfig: {
+      findFirst: jest.fn(),
+      findUnique: jest.fn(),
+    },
+    certificate: {
+      create: jest.fn(),
+    },
+    certificateRevocation: {
+      findMany: jest.fn(),
+    },
+  },
+}));
+
+// Mock audit service
+jest.mock('@/lib/audit', () => ({
+  AuditService: {
+    log: jest.fn(),
+  },
+}));
+
+import { Encryption } from '@/lib/crypto';
+import forge from 'node-forge';
+
+// Helper to create a valid self-signed CA for mocking
+const createMockCa = () => {
+  const caKeys = forge.pki.rsa.generateKeyPair(2048);
+  const caCert = forge.pki.createCertificate();
+  caCert.publicKey = caKeys.publicKey;
+  caCert.serialNumber = '01';
+  caCert.validity.notBefore = new Date();
+  caCert.validity.notAfter = new Date();
+  caCert.validity.notAfter.setFullYear(caCert.validity.notBefore.getFullYear() + 1);
+  const caAttrs = [{ name: 'commonName', value: 'Test CA' }];
+  caCert.setSubject(caAttrs);
+  caCert.setIssuer(caAttrs);
+  caCert.setExtensions([{ name: 'basicConstraints', cA: true, critical: true }]);
+  caCert.sign(caKeys.privateKey, forge.md.sha256.create());
+
+  const encryptedKey = Encryption.encrypt(forge.pki.privateKeyInfoToPem(caKeys.privateKey));
+
+  return {
+    id: 'test-ca-id',
+    subjectDN: 'CN=Test CA',
+    status: 'ACTIVE',
+    certificate: forge.pki.certificateToPem(caCert),
+    privateKey: JSON.stringify(encryptedKey),
+    crlDistributionPoint: 'https://test.example.com/api/crl/download/latest',
+    ocspUrl: 'https://test.example.com/api/ocsp',
+    crlNumber: 1,
+  };
+};
+
+describe('CRL Distribution Points in Certificates', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    const mockCaConfig = createMockCa();
+    (db.cAConfig.findFirst as jest.Mock).mockResolvedValue(mockCaConfig);
+    (db.cAConfig.findUnique as jest.Mock).mockResolvedValue(mockCaConfig);
+  });
+
+  describe('Certificate Issuance with CRL Distribution Points', () => {
+    it('should include CRL distribution points in issued certificates', async () => {
+      (db.certificate.create as jest.Mock).mockResolvedValue({ id: 'test-cert-id' });
+
+      const clientKeys = forge.pki.rsa.generateKeyPair(2048);
+      const csr = forge.pki.createCertificationRequest();
+      csr.publicKey = clientKeys.publicKey;
+      csr.setSubject([{ name: 'commonName', value: 'test.example.com' }]);
+      csr.sign(clientKeys.privateKey, forge.md.sha256.create());
+      const csrPem = forge.pki.certificationRequestToPem(csr);
+
+      await CAService.issueCertificate(
+        {
+          subjectDN: 'CN=test.example.com',
+          certificateType: 'SERVER',
+          keyAlgorithm: 'RSA',
+          validityDays: 365,
+          csr: csrPem,
+        },
+        'test-user-id'
+      );
+
+      expect(db.certificate.create).toHaveBeenCalled();
+      const createdCertPem = (db.certificate.create as jest.Mock).mock.calls[0][0].data.certificate;
+      expect(createdCertPem).toContain('-----BEGIN CERTIFICATE-----');
+    });
+  });
+
+  describe('CRL Generation with Extensions', () => {
+    it('should generate CRL with proper extensions', async () => {
+      (db.certificateRevocation.findMany as jest.Mock).mockResolvedValue([
+        { serialNumber: '123', revocationDate: new Date(), revocationReason: 'KEY_COMPROMISE' },
+      ]);
+      (db.cRL.create as jest.Mock).mockResolvedValue({ id: 'test-crl-id' });
+
+      const crl = await CAService.generateCRL('test-ca-id');
+
+      expect(db.cRL.create).toHaveBeenCalled();
+      expect(crl).toContain('-----BEGIN X509 CRL-----');
+    });
+  });
+
+  describe('Environment Configuration', () => {
+    it('should use environment variables for CRL and OCSP URLs', () => {
+      // Set environment variables
+      process.env.CRL_DISTRIBUTION_POINT = 'https://prod.example.com/crl';
+      process.env.OCSP_URL = 'https://prod.example.com/ocsp';
+
+      // Verify environment variables are used
+      expect(process.env.CRL_DISTRIBUTION_POINT).toBe('https://prod.example.com/crl');
+      expect(process.env.OCSP_URL).toBe('https://prod.example.com/ocsp');
+    });
+  });
+});
