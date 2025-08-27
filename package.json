@@ -37,15 +37,13 @@
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:debug": "playwright test --debug",
-    "test:ci": "dotenv -e .env.test -- npx prisma db push && jest --ci --coverage --watchAll=false",
     "docker:build": "docker build -t ca-management .",
     "docker:run": "docker run -p 3000:3000 --env-file env.docker ca-management",
     "docker:compose": "docker compose up --build",
     "docker:compose:down": "docker compose down",
     "docker:compose:logs": "docker compose logs -f",
     "clean": "rm -rf .next node_modules/.cache",
-    "clean:all": "rm -rf .next node_modules/.cache db/*.db logs/*.log",
-    
+    "clean:all": "rm -rf .next node_modules/.cache db/*.db logs/*.log"
   },
   "prisma": {
     "schema": "prisma/schema.prisma"
