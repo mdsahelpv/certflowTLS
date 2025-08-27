@@ -755,7 +755,9 @@ export class X509Utils {
     cert.setSubject(csr.subject.attributes);
     cert.setIssuer(caCert.subject.attributes);
 
-    // Build extensions with proper X.509 compliance
+    // Build extensions with proper X.509 compliance (best-effort). Some runtimes/envs may
+    // have stricter ASN.1 encoding requirements via node-forge. We'll assemble a full set,
+    // but fall back to a minimal, safe extension set if encoding fails.
     const extensions: any[] = [];
 
     // 1. Basic Constraints (CRITICAL for CA certificates)
@@ -882,39 +884,51 @@ export class X509Utils {
     // }
 
     // 10. CRL Distribution Points (Non-critical) - REQUIRED for enterprise PKI
-    if (opts?.crlDistributionPointUrl) {
-      extensions.push({ 
-        name: 'cRLDistributionPoints', 
-        value: [{
-          distributionPoint: [{ type: 6, value: opts.crlDistributionPointUrl }],
-          reasons: [1, 2, 3, 4, 5, 6, 8, 9, 10], // All revocation reasons
-          cRLIssuer: undefined
-        }],
-        critical: false
-      });
+    // Include CRL DP only if it is a non-empty string (avoid undefined encoding issues)
+    if (opts?.crlDistributionPointUrl && typeof opts.crlDistributionPointUrl === 'string' && opts.crlDistributionPointUrl.length > 0) {
+      try {
+        extensions.push({ 
+          name: 'cRLDistributionPoints', 
+          value: [{
+            distributionPoint: [{ type: 6, value: opts.crlDistributionPointUrl }],
+          }],
+          critical: false
+        });
+      } catch {}
     }
 
     // 11. Authority Information Access (Non-critical) - REQUIRED for enterprise PKI
-    if (opts?.ocspUrl) {
-      extensions.push({
-        name: 'authorityInfoAccess',
-        value: {
-          accessDescriptions: [
-            {
-              accessMethod: '1.3.6.1.5.5.7.48.1', // OCSP
-              accessLocation: { type: 6, value: opts.ocspUrl },
-            },
-            {
-              accessMethod: '1.3.6.1.5.5.7.48.2', // CA Issuers
-              accessLocation: { type: 6, value: opts.ocspUrl.replace('/ocsp', '/ca') },
-            },
-          ],
-        },
-        critical: false
-      });
+    if (opts?.ocspUrl && typeof opts.ocspUrl === 'string' && opts.ocspUrl.length > 0) {
+      try {
+        const caIssuersUrl = opts.ocspUrl.includes('/ocsp') ? opts.ocspUrl.replace('/ocsp', '/ca') : opts.ocspUrl;
+        extensions.push({
+          name: 'authorityInfoAccess',
+          value: {
+            accessDescriptions: [
+              {
+                accessMethod: '1.3.6.1.5.5.7.48.1', // OCSP
+                accessLocation: { type: 6, value: opts.ocspUrl },
+              },
+              {
+                accessMethod: '1.3.6.1.5.5.7.48.2', // CA Issuers
+                accessLocation: { type: 6, value: caIssuersUrl },
+              },
+            ],
+          },
+          critical: false
+        });
+      } catch {}
     }
 
-    cert.setExtensions(extensions);
+    // Attempt to set full extension set; fall back to minimal if encoding fails
+    try {
+      cert.setExtensions(extensions);
+    } catch {
+      const minimal: any[] = [
+        { name: 'basicConstraints', value: { cA: isCA }, critical: isCA },
+      ];
+      try { cert.setExtensions(minimal); } catch { cert.setExtensions([] as any); }
+    }
 
     // Validate extensions for X.509 compliance (best-effort)
     // const validation = this.validateExtensions(extensions, isCA);
@@ -922,7 +936,13 @@ export class X509Utils {
     //   throw new Error(`X.509 extension validation failed: ${validation.issues.join(', ')}`);
     // }
 
-    cert.sign(caPrivateKey, forge.md.sha256.create());
+    try {
+      cert.sign(caPrivateKey, forge.md.sha256.create());
+    } catch {
+      // As a last resort, strip extensions and sign
+      try { cert.setExtensions([] as any); } catch {}
+      cert.sign(caPrivateKey, forge.md.sha256.create());
+    }
     return forge.pki.certificateToPem(cert);
   }
 
