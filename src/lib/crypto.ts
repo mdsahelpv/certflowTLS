@@ -227,8 +227,8 @@ export class CRLUtils {
       extnValue: new asn1js.Integer({ value: crlNumber }).toBER(false),
     }));
 
-    const authorityKeyIdentifier = await crypto.exportKey("spki", await caCert.getPublicKey());
-    const authorityKeyIdentifierHashed = await crypto.digest({ name: "SHA-1" }, authorityKeyIdentifier);
+    const authorityKeyIdentifier = caCert.subjectPublicKeyInfo.subjectPublicKey.valueBlock.valueHex;
+    const authorityKeyIdentifierHashed = await crypto.digest({ name: "SHA-1" }, new Uint8Array(authorityKeyIdentifier));
 
     extensions.push(new pkijs.Extension({
         extnID: "2.5.29.35", // authorityKeyIdentifier
@@ -299,8 +299,8 @@ export class CRLUtils {
         extnValue: new asn1js.Integer({ value: deltaCrlNumber }).toBER(false),
     }));
 
-    const authorityKeyIdentifier = await crypto.exportKey("spki", await caCert.getPublicKey());
-    const authorityKeyIdentifierHashed = await crypto.digest({ name: "SHA-1" }, authorityKeyIdentifier);
+    const authorityKeyIdentifier = caCert.subjectPublicKeyInfo.subjectPublicKey.valueBlock.valueHex;
+    const authorityKeyIdentifierHashed = await crypto.digest({ name: "SHA-1" }, new Uint8Array(authorityKeyIdentifier));
     extensions.push(new pkijs.Extension({
         extnID: "2.5.29.35", // authorityKeyIdentifier
         critical: false,
