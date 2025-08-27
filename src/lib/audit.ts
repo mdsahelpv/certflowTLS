@@ -24,17 +24,41 @@ export class AuditService {
       // Not in a request context; leave defaults
     }
 
-    return await db.auditLog.create({
-      data: {
-        action: data.action,
-        userId: data.userId,
-        username: data.username,
-        ipAddress,
-        userAgent,
-        description: data.description,
-        metadata: data.metadata ? JSON.stringify(data.metadata) : null,
-      },
-    });
+    // Avoid FK violations: only include userId if it exists
+    let safeUserId: string | undefined = data.userId;
+    try {
+      if (data.userId) {
+        const user = await db.user.findUnique({ where: { id: data.userId } });
+        if (!user) safeUserId = undefined;
+      }
+    } catch {
+      safeUserId = undefined;
+    }
+
+    try {
+      return await db.auditLog.create({
+        data: {
+          action: data.action,
+          userId: safeUserId,
+          username: data.username,
+          ipAddress,
+          userAgent,
+          description: data.description,
+          metadata: data.metadata ? JSON.stringify(data.metadata) : null,
+        },
+      });
+    } catch (e) {
+      // Last-resort fallback: log without any user linkage
+      return await db.auditLog.create({
+        data: {
+          action: data.action,
+          ipAddress,
+          userAgent,
+          description: data.description,
+          metadata: data.metadata ? JSON.stringify(data.metadata) : null,
+        },
+      });
+    }
   }
 
   static async getAuditLogs(filters?: {
