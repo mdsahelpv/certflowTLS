@@ -99,7 +99,7 @@ export class SystemInitializer {
       // Generate key pair
       const { privateKey, publicKey } = CSRUtils.generateKeyPair(keyAlgorithm, keyAlgorithm === 'RSA' ? keySize : undefined, keyAlgorithm === 'ECDSA' ? curve : undefined);
 
-      // Create minimal self-signed CA certificate using forge directly, with no extensions
+      // Create self-signed CA certificate using forge with minimal CA extensions (basicConstraints, keyUsage, SKI/AKI)
       const cert = forge.pki.createCertificate();
       cert.publicKey = forge.pki.publicKeyFromPem(publicKey) as any;
       cert.serialNumber = new forge.jsbn.BigInteger(forge.util.bytesToHex(forge.random.getBytesSync(16)), 16).toString(16);
@@ -117,6 +117,20 @@ export class SystemInitializer {
       cert.setSubject(attrs);
       cert.setIssuer(attrs);
       const privKey = forge.pki.privateKeyFromPem(privateKey) as any;
+      // Compute Subject Key Identifier from public key
+      try {
+        const publicKeyDer = forge.asn1.toDer(forge.pki.publicKeyToAsn1(cert.publicKey)).getBytes();
+        const sha1 = forge.md.sha1.create();
+        sha1.update(publicKeyDer);
+        const skiBytes = sha1.digest().getBytes();
+        const extensions: any[] = [
+          { name: 'basicConstraints', value: { cA: true }, critical: true },
+          { name: 'keyUsage', value: { keyCertSign: true, cRLSign: true }, critical: true },
+          { name: 'subjectKeyIdentifier', value: skiBytes, critical: false },
+          { name: 'authorityKeyIdentifier', value: { keyIdentifier: skiBytes }, critical: false },
+        ];
+        try { cert.setExtensions(extensions as any); } catch {}
+      } catch {}
       cert.sign(privKey, forge.md.sha256.create());
       const certificate = forge.pki.certificateToPem(cert);
 
