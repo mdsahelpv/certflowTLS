@@ -1,6 +1,5 @@
 import { PrismaClient } from '@prisma/client'
 import { getPrismaLogLevels } from '@/lib/logger'
-import '@/lib/startup'
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
