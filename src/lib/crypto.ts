@@ -179,6 +179,24 @@ import * as asn1js from 'asn1js';
 import * as pkijs from 'pkijs';
 
 export class CRLUtils {
+  private static ensurePkijsEngine(): void {
+    try {
+      const current = (pkijs as any).getCrypto?.();
+      if (!current) {
+        const nodeCrypto: any = (require('crypto') as any).webcrypto;
+        if (nodeCrypto) {
+          const engine = new (pkijs as any).CryptoEngine({
+            name: 'nodeEngine',
+            crypto: nodeCrypto,
+            subtle: nodeCrypto.subtle,
+          });
+          (pkijs as any).setEngine('nodeEngine', nodeCrypto, engine);
+        }
+      }
+    } catch {
+      // ignore; pkijs may already be configured
+    }
+  }
   static async generateCRL(
     revokedCertificates: Array<{
       serialNumber: string;
@@ -191,6 +209,7 @@ export class CRLUtils {
     nextUpdate: Date,
     crlNumber: number
   ): Promise<string> {
+    this.ensurePkijsEngine();
     // Initialize pkijs
     const crypto = pkijs.getCrypto(true);
 
@@ -265,6 +284,7 @@ export class CRLUtils {
     baseCrlNumber: number,
     deltaCrlNumber: number,
   ): Promise<string> {
+    this.ensurePkijsEngine();
     const crypto = pkijs.getCrypto(true);
     const crl = new pkijs.CertificateRevocationList();
 
