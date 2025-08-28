@@ -13,25 +13,25 @@ const eslintConfig = [
   ...compat.extends("next/core-web-vitals", "next/typescript"),
   {
     rules: {
-      // TypeScript 相关规则
+      // TypeScript rules
       "@typescript-eslint/no-explicit-any": "off",
       "@typescript-eslint/no-unused-vars": "off",
       "@typescript-eslint/no-non-null-assertion": "off",
       "@typescript-eslint/ban-ts-comment": "off",
       "@typescript-eslint/prefer-as-const": "off",
       
-      // React 相关规则
+      // React rules
       "react-hooks/exhaustive-deps": "off",
       "react/no-unescaped-entities": "off",
       "react/display-name": "off",
       "react/prop-types": "off",
       
-      // Next.js 相关规则
+      // Next.js rules
       "@next/next/no-img-element": "off",
       "@next/next/no-html-link-for-pages": "off",
       
-      // 一般JavaScript规则
-      "prefer-const": "off",  // 关闭prefer-const规则
+      // General JavaScript rules
+"prefer-const": "off",  // Disable prefer-const rule
       "no-unused-vars": "off",
       "no-console": "off",
       "no-debugger": "off",
