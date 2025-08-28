@@ -359,27 +359,41 @@ export class CAService {
 
     // Create revocation record
     // Ensure revokedById exists to avoid FK violations
-    let revokedByIdSafe: string | undefined = revokedById;
+    let revokedByIdSafe: string = revokedById;
     try {
       if (revokedById) {
         const user = await db.user.findUnique({ where: { id: revokedById } });
-        if (!user) revokedByIdSafe = undefined;
+        if (!user) {
+          // If user doesn't exist, try to find any admin user as fallback
+          const adminUser = await db.user.findFirst({ 
+            where: { role: 'ADMIN' },
+            select: { id: true }
+          });
+          revokedByIdSafe = adminUser?.id || revokedById; // Use original as last resort
+        }
       }
     } catch {
-      revokedByIdSafe = undefined;
+      // If user lookup fails, use the original ID as fallback
+      revokedByIdSafe = revokedById;
     }
 
     try {
       await db.certificateRevocation.create({
         data: {
-          certificateId: certificate.id,
+          certificate: {
+            connect: { id: certificate.id }
+          },
           serialNumber,
           revocationReason: reason as any,
-          revokedById: revokedByIdSafe,
+          revokedBy: {
+            connect: { id: revokedByIdSafe }
+          },
         },
       });
     } catch (e: any) {
-      // Ignore unique/FK races: if a record already exists or user FK fails, proceed as revoked
+      // If revocation record creation fails, we still want to mark the certificate as revoked
+      // The certificate status update above is the primary operation
+      console.warn(`Revocation record creation failed for ${serialNumber}:`, e.message);
     }
 
     // Log audit event
