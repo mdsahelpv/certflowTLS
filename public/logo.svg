@@ -37,7 +37,7 @@
       }
     </style>
     
-    <!-- 发光滤镜 -->
+    <!-- Glow filter -->
     <filter id="glow-filter" x="-50%" y="-50%" width="200%" height="200%">
       <feGaussianBlur stdDeviation="8" result="coloredBlur"/>
       <feMerge> 
@@ -46,7 +46,7 @@
       </feMerge>
     </filter>
     
-    <!-- 动态渐变 -->
+    <!-- Dynamic gradient -->
     <linearGradient id="gradient1" x1="531.58" y1="-4.02" x2="531.58" y2="1661.41" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#070606">
         <animate attributeName="stop-color" values="#070606;#5a5a5a;#070606" dur="1.8s" repeatCount="indefinite"/>
@@ -83,14 +83,14 @@
       </stop>
     </linearGradient>
     
-    <!-- 光晕渐变 -->
+    <!-- Halo gradient -->
     <radialGradient id="glow-gradient" cx="50%" cy="50%" r="50%">
       <stop offset="0%" stop-color="#ffffff" stop-opacity="0.3"/>
       <stop offset="70%" stop-color="#888888" stop-opacity="0.1"/>
       <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
     </radialGradient>
     
-    <!-- 闪光效果 -->
+    <!-- Shine effect -->
     <linearGradient id="shine-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#ffffff" stop-opacity="0"/>
       <stop offset="45%" stop-color="#ffffff" stop-opacity="0"/>
@@ -99,7 +99,7 @@
       <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
     </linearGradient>
     
-    <!-- 裁切路径 -->
+    <!-- Clip path -->
     <clipPath id="shape-clip">
       <polygon points="1008.73 0 827.29 251.03 54.43 251.03 235.74 0 1008.73 0"/>
       <polygon points="1937.79 1449.1 1756.47 1700 986.3 1700 1167.48 1449.1 1937.79 1449.1"/>
@@ -109,7 +109,7 @@
   
   <g class="glow breathe">
     <g class="pulse wave-effect">
-      <!-- 主要几何形状 -->
+      <!-- Main geometric shapes -->
       <polygon class="cls-1" points="1008.73 0 827.29 251.03 54.43 251.03 235.74 0 1008.73 0"/>
       <polygon class="cls-3" points="1937.79 1449.1 1756.47 1700 986.3 1700 1167.48 1449.1 1937.79 1449.1"/>
       <polygon class="cls-2" points="2000 0 771.98 1700 0 1700 1228.02 0 2000 0"/>
