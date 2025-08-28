@@ -124,20 +124,24 @@ export default function CRLPage() {
     setError('');
 
     try {
-      // Load CAs, CRLs, revoked list, and stats for selected CA
-      const [caListRes, crlResponse, revokedResponse, statsResponse] = await Promise.all([
-        fetch('/api/ca/status'),
-        fetch(`/api/crl${selectedCAId ? `?caId=${selectedCAId}` : ''}`),
-        fetch(`/api/crl/revoked${selectedCAId ? `?caId=${selectedCAId}` : ''}`),
-        fetch(`/api/crl/validate${selectedCAId ? `?caId=${selectedCAId}` : ''}`)
-      ]);
-
+      // First, get the CA list and determine the active CA
+      const caListRes = await fetch('/api/ca/status');
+      let activeCAId = selectedCAId;
+      
       if (caListRes.ok) {
         const caList = await caListRes.json();
-        if (!selectedCAId && caList.length > 0) {
-          setSelectedCAId(caList.find((c: any) => c.status === 'ACTIVE')?.id || caList[0].id);
+        if (!activeCAId && caList.length > 0) {
+          activeCAId = caList.find((c: any) => c.status === 'ACTIVE')?.id || caList[0].id;
+          setSelectedCAId(activeCAId);
         }
       }
+
+      // Now fetch all data with the correct CA filter
+      const [crlResponse, revokedResponse, statsResponse] = await Promise.all([
+        fetch(`/api/crl${activeCAId ? `?caId=${activeCAId}` : ''}`),
+        fetch(`/api/crl/revoked${activeCAId ? `?caId=${activeCAId}` : ''}`),
+        fetch(`/api/crl/validate${activeCAId ? `?caId=${activeCAId}` : ''}`)
+      ]);
 
       if (crlResponse.ok) {
         const crlData = await crlResponse.json();
