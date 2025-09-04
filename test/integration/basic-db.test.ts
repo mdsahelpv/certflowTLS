@@ -28,26 +28,29 @@ describe('Basic Database Integration Tests', () => {
   beforeEach(async () => {
     // Wait a bit for Prisma to be fully ready
     await new Promise(resolve => setTimeout(resolve, 100));
-    
-    // Clean up database before each test
+
+    // Clean up database before each test using transaction for atomicity
     try {
-      // Delete in reverse order of dependencies
-      await prisma.certificateRevocation.deleteMany();
-      await prisma.certificate.deleteMany();
-      await prisma.caConfig.deleteMany();
-      await prisma.auditLog.deleteMany();
-      await prisma.user.deleteMany();
-      
-      // Verify cleanup was successful
-      const userCount = await prisma.user.count();
-      if (userCount > 0) {
-        console.log(`Warning: Database cleanup incomplete. User count: ${userCount}`);
-        // Force cleanup by deleting all users again
-        await prisma.user.deleteMany();
-      }
+      await prisma.$transaction(async (tx) => {
+        // Delete in reverse order of dependencies to avoid foreign key constraints
+        await tx.certificateRevocation.deleteMany();
+        await tx.certificate.deleteMany();
+        await tx.cAConfig.deleteMany();
+        await tx.auditLog.deleteMany();
+        await tx.user.deleteMany();
+      });
     } catch (error) {
-      console.log('Database cleanup error:', error.message);
-      // If cleanup fails, try to continue with the test
+      console.log('Database cleanup error:', (error as Error).message);
+      // If transaction fails, try individual deletes
+      try {
+        await prisma.certificateRevocation.deleteMany();
+        await prisma.certificate.deleteMany();
+        await prisma.cAConfig.deleteMany();
+        await prisma.auditLog.deleteMany();
+        await prisma.user.deleteMany();
+      } catch (individualError) {
+        console.log('Individual cleanup also failed:', (individualError as Error).message);
+      }
     }
   });
 
@@ -65,8 +68,8 @@ describe('Basic Database Integration Tests', () => {
       username: 'testuser',
       email: 'test@example.com',
       password: 'hashedpassword',
-      role: 'OPERATOR',
-      status: 'ACTIVE',
+      role: 'OPERATOR' as const,
+      status: 'ACTIVE' as const,
       name: 'Test User',
     };
 
@@ -91,8 +94,8 @@ describe('Basic Database Integration Tests', () => {
       username: 'duplicate',
       email: 'user1@example.com',
       password: 'hash1',
-      role: 'OPERATOR',
-      status: 'ACTIVE',
+      role: 'OPERATOR' as const,
+      status: 'ACTIVE' as const,
       name: 'User 1',
     };
 
@@ -100,8 +103,8 @@ describe('Basic Database Integration Tests', () => {
       username: 'duplicate', // Same username
       email: 'user2@example.com',
       password: 'hash2',
-      role: 'VIEWER',
-      status: 'ACTIVE',
+      role: 'VIEWER' as const,
+      status: 'ACTIVE' as const,
       name: 'User 2',
     };
 
@@ -119,8 +122,8 @@ describe('Basic Database Integration Tests', () => {
       username: 'user1',
       email: 'duplicate@example.com',
       password: 'hash1',
-      role: 'OPERATOR',
-      status: 'ACTIVE',
+      role: 'OPERATOR' as const,
+      status: 'ACTIVE' as const,
       name: 'User 1',
     };
 
@@ -128,8 +131,8 @@ describe('Basic Database Integration Tests', () => {
       username: 'user2',
       email: 'duplicate@example.com', // Same email
       password: 'hash2',
-      role: 'VIEWER',
-      status: 'ACTIVE',
+      role: 'VIEWER' as const,
+      status: 'ACTIVE' as const,
       name: 'User 2',
     };
 
@@ -148,8 +151,8 @@ describe('Basic Database Integration Tests', () => {
         username: 'updateuser',
         email: 'update@example.com',
         password: 'hash',
-        role: 'VIEWER',
-        status: 'ACTIVE',
+        role: 'VIEWER' as const,
+        status: 'ACTIVE' as const,
         name: 'Update User',
       },
     });
@@ -173,8 +176,8 @@ describe('Basic Database Integration Tests', () => {
         username: 'deleteuser',
         email: 'delete@example.com',
         password: 'hash',
-        role: 'OPERATOR',
-        status: 'ACTIVE',
+        role: 'OPERATOR' as const,
+        status: 'ACTIVE' as const,
         name: 'Delete User',
       },
     });
@@ -191,9 +194,9 @@ describe('Basic Database Integration Tests', () => {
   test('should count users correctly', async () => {
     // Create multiple users with unique emails
     const users = [
-      { username: 'countuser1', email: 'count1@example.com', password: 'hash1', role: 'OPERATOR', status: 'ACTIVE', name: 'Count User 1' },
-      { username: 'countuser2', email: 'count2@example.com', password: 'hash2', role: 'VIEWER', status: 'ACTIVE', name: 'Count User 2' },
-      { username: 'countuser3', email: 'count3@example.com', password: 'hash3', role: 'ADMIN', status: 'ACTIVE', name: 'Count User 3' },
+      { username: 'countuser1', email: 'count1@example.com', password: 'hash1', role: 'OPERATOR' as const, status: 'ACTIVE' as const, name: 'Count User 1' },
+      { username: 'countuser2', email: 'count2@example.com', password: 'hash2', role: 'VIEWER' as const, status: 'ACTIVE' as const, name: 'Count User 2' },
+      { username: 'countuser3', email: 'count3@example.com', password: 'hash3', role: 'ADMIN' as const, status: 'ACTIVE' as const, name: 'Count User 3' },
     ];
 
     await Promise.all(users.map(userData => prisma.user.create({ data: userData })));
@@ -214,8 +217,8 @@ describe('Basic Database Integration Tests', () => {
         username: 'criteriaadmin',
         email: 'criteriaadmin@example.com',
         password: 'hash',
-        role: 'ADMIN',
-        status: 'ACTIVE',
+        role: 'ADMIN' as const,
+        status: 'ACTIVE' as const,
         name: 'Criteria Admin',
       },
     });
@@ -225,8 +228,8 @@ describe('Basic Database Integration Tests', () => {
         username: 'criteriaoperator',
         email: 'criteriaoperator@example.com',
         password: 'hash',
-        role: 'OPERATOR',
-        status: 'ACTIVE',
+        role: 'OPERATOR' as const,
+        status: 'ACTIVE' as const,
         name: 'Criteria Operator',
       },
     });

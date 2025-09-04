@@ -31,12 +31,29 @@ describe('API Integration Tests', () => {
   });
 
   beforeEach(async () => {
-    // Clean up database
-    await prisma.certificateRevocation.deleteMany();
-    await prisma.certificate.deleteMany();
-    await prisma.caConfig.deleteMany();
-    await prisma.auditLog.deleteMany();
-    await prisma.user.deleteMany();
+    // Clean up database using transaction for atomicity
+    try {
+      await prisma.$transaction(async (tx) => {
+        // Delete in reverse order of dependencies to avoid foreign key constraints
+        await tx.certificateRevocation.deleteMany();
+        await tx.certificate.deleteMany();
+        await tx.cAConfig.deleteMany();
+        await tx.auditLog.deleteMany();
+        await tx.user.deleteMany();
+      });
+    } catch (error) {
+      console.log('Database cleanup error:', (error as Error).message);
+      // If transaction fails, try individual deletes
+      try {
+        await prisma.certificateRevocation.deleteMany();
+        await prisma.certificate.deleteMany();
+        await prisma.cAConfig.deleteMany();
+        await prisma.auditLog.deleteMany();
+        await prisma.user.deleteMany();
+      } catch (individualError) {
+        console.log('Individual cleanup also failed:', (individualError as Error).message);
+      }
+    }
 
     // Create test user
     testUser = await prisma.user.create({

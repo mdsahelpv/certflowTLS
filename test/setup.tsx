@@ -34,6 +34,45 @@ jest.mock('next/navigation', () => ({
   usePathname: mockUsePathname,
 }));
 
+// Mock Next.js server APIs
+jest.mock('next/server', () => ({
+  NextRequest: class MockNextRequest {
+    constructor(input: string | URL, init?: RequestInit) {
+      this.url = typeof input === 'string' ? input : input.href;
+      this.method = init?.method || 'GET';
+      this.headers = new Map();
+      this.cookies = {
+        get: jest.fn((name: string) => {
+          if (name === 'next-auth.session-token') return 'mock-session-token';
+          return undefined;
+        }),
+        getAll: jest.fn(() => []),
+        set: jest.fn(),
+        delete: jest.fn(),
+      };
+      this.nextUrl = new URL(this.url);
+    }
+    url: string;
+    method: string;
+    headers: Map<string, string>;
+    cookies: any;
+    nextUrl: URL;
+    json() { return Promise.resolve({}); }
+    text() { return Promise.resolve(''); }
+  },
+  NextResponse: {
+    json: jest.fn((data: any, options?: { status?: number }) => ({
+      status: options?.status || 200,
+      json: () => Promise.resolve(data),
+      headers: new Map([['content-type', 'application/json']]),
+    })),
+    redirect: jest.fn((url: string) => ({
+      status: 302,
+      headers: new Map([['location', url]]),
+    })),
+  },
+}));
+
 // Mock Next.js auth
 const mockUseSession = jest.fn(() => ({
   data: {
