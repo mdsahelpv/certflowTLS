@@ -84,15 +84,58 @@ export async function POST(request: NextRequest) {
         });
 
       case 'toggleMaintenance':
-        // Toggle maintenance mode
-        process.env.MAINTENANCE_MODE = config.maintenanceMode ? 'true' : 'false';
-        if (config.maintenanceMessage) {
-          process.env.MAINTENANCE_MESSAGE = config.maintenanceMessage;
+        try {
+          const session = await getServerSession(authOptions);
+          const userId = session?.user?.id;
+
+          if (config.maintenanceMode) {
+            // Enable maintenance mode
+            await (db as any).maintenanceMode.upsert({
+              where: { id: 'default' }, // Use a fixed ID for single record
+              update: {
+                isEnabled: true,
+                message: config.maintenanceMessage || 'System is currently under maintenance. Please try again later.',
+                startTime: new Date(),
+                createdBy: userId,
+                updatedAt: new Date()
+              },
+              create: {
+                id: 'default',
+                isEnabled: true,
+                message: config.maintenanceMessage || 'System is currently under maintenance. Please try again later.',
+                startTime: new Date(),
+                createdBy: userId
+              }
+            });
+          } else {
+            // Disable maintenance mode
+            await (db as any).maintenanceMode.upsert({
+              where: { id: 'default' },
+              update: {
+                isEnabled: false,
+                endTime: new Date(),
+                updatedAt: new Date()
+              },
+              create: {
+                id: 'default',
+                isEnabled: false,
+                message: 'System is currently under maintenance. Please try again later.',
+                endTime: new Date()
+              }
+            });
+          }
+
+          return NextResponse.json({
+            success: true,
+            message: `Maintenance mode ${config.maintenanceMode ? 'enabled' : 'disabled'}`
+          });
+        } catch (error) {
+          console.error('Failed to toggle maintenance mode:', error);
+          return NextResponse.json({
+            error: 'Failed to toggle maintenance mode',
+            details: 'Database operation failed'
+          }, { status: 500 });
         }
-        return NextResponse.json({
-          success: true,
-          message: `Maintenance mode ${config.maintenanceMode ? 'enabled' : 'disabled'}`
-        });
 
       case 'createBackup':
         try {
@@ -159,6 +202,100 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({
             error: 'Backup creation failed',
             details: backupError.message
+          }, { status: 500 });
+        }
+
+      case 'listBackups':
+        try {
+          const backupPath = path.join(process.cwd(), 'backups');
+
+          if (!fs.existsSync(backupPath)) {
+            return NextResponse.json({
+              success: true,
+              backups: []
+            });
+          }
+
+          // Read backup directory and get file information
+          const files = fs.readdirSync(backupPath)
+            .filter(file => file.endsWith('.sql'))
+            .map(file => {
+              const filePath = path.join(backupPath, file);
+              const stats = fs.statSync(filePath);
+
+              // Parse filename to extract metadata
+              const match = file.match(/^backup-(.+?)-(.+)\.sql$/);
+              let databaseType = 'unknown';
+              let timestamp = stats.mtime.toISOString();
+
+              if (match) {
+                databaseType = match[1];
+                // Convert timestamp back from filename format
+                const timestampStr = match[2].replace(/-/g, ':').replace(/-/g, '.');
+                try {
+                  timestamp = new Date(timestampStr).toISOString();
+                } catch (e) {
+                  // Keep file mtime if parsing fails
+                }
+              }
+
+              return {
+                filename: file,
+                databaseType,
+                size: stats.size,
+                sizeFormatted: `${(stats.size / 1024).toFixed(2)} KB`,
+                createdAt: timestamp,
+                modifiedAt: stats.mtime.toISOString(),
+              };
+            })
+            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()); // Sort by newest first
+
+          return NextResponse.json({
+            success: true,
+            backups: files
+          });
+
+        } catch (listError: any) {
+          console.error('Failed to list backups:', listError);
+          return NextResponse.json({
+            error: 'Failed to list backups',
+            details: listError.message
+          }, { status: 500 });
+        }
+
+      case 'deleteBackup':
+        try {
+          const { filename } = config;
+
+          if (!filename) {
+            return NextResponse.json({
+              error: 'Filename is required'
+            }, { status: 400 });
+          }
+
+          const backupPath = path.join(process.cwd(), 'backups');
+          const filePath = path.join(backupPath, filename);
+
+          // Check if file exists
+          if (!fs.existsSync(filePath)) {
+            return NextResponse.json({
+              error: 'Backup file not found'
+            }, { status: 404 });
+          }
+
+          // Delete the file
+          fs.unlinkSync(filePath);
+
+          return NextResponse.json({
+            success: true,
+            message: `Backup "${filename}" deleted successfully`
+          });
+
+        } catch (deleteError: any) {
+          console.error('Failed to delete backup:', deleteError);
+          return NextResponse.json({
+            error: 'Failed to delete backup',
+            details: deleteError.message
           }, { status: 500 });
         }
 

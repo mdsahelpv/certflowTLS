@@ -183,7 +183,6 @@ enum AuditAction {
   LOGOUT
   CA_CSR_GENERATED
   CA_CERTIFICATE_UPLOADED
-  CA_DELETED
   CERTIFICATE_ISSUED
   CERTIFICATE_RENEWED
   CERTIFICATE_REVOKED
@@ -236,7 +235,7 @@ model NotificationSetting {
   daysBefore   Int               @default(30) // For expiry notifications
   
   // Webhook-specific configuration
-  webhookConfig String?          // JSON string for { timeout, retries, retryDelay, headers, secret }
+  webhookConfig Json?            // JSON object for { timeout, retries, retryDelay, headers, secret }
   
   createdAt    DateTime          @default(now())
   updatedAt    DateTime          @updatedAt
@@ -268,7 +267,7 @@ model WebhookDelivery {
   webhookId    String            // Reference to notification setting
   url          String
   event        NotificationEvent
-  payload      String            // JSON string of full webhook payload
+  payload      Json              // JSON object of full webhook payload
   status       String            // pending, sent, failed, retrying
   statusCode   Int?
   responseTime Int?              // Response time in milliseconds
@@ -296,4 +295,17 @@ model SystemConfig {
   updatedAt            DateTime @updatedAt
 
   @@map("system_configs")
+}
+
+// Maintenance Mode Configuration
+model MaintenanceMode {
+  id                   String   @id @default(cuid())
+  isEnabled            Boolean  @default(false)
+  message              String   @default("System is currently under maintenance. Please try again later.")
+  startTime            DateTime?
+  endTime              DateTime?
+  createdBy            String?
+  updatedAt            DateTime @updatedAt
+
+  @@map("maintenance_mode")
 }

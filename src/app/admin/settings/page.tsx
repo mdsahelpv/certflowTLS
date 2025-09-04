@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/hooks/useAuth';
-import { Shield, Database, Lock, Bell, FileText, Settings as SettingsIcon, Activity, Zap, Download, RefreshCw } from 'lucide-react';
+import { Shield, Database, Lock, Bell, FileText, Settings as SettingsIcon, Activity, Zap, Download, RefreshCw, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 export default function AdminSettingsPage() {
@@ -21,6 +21,7 @@ export default function AdminSettingsPage() {
   const [loading, setLoading] = useState(false);
   const [maintenanceMode, setMaintenanceMode] = useState(false);
   const [maintenanceMessage, setMaintenanceMessage] = useState('');
+  const [backupHistory, setBackupHistory] = useState<any[]>([]);
   const [securityConfig, setSecurityConfig] = useState<any>(null);
   const [passwordPolicy, setPasswordPolicy] = useState({
     minLength: 8,
@@ -128,6 +129,29 @@ export default function AdminSettingsPage() {
     }
   };
 
+  // Fetch backup history
+  const fetchBackupHistory = async () => {
+    try {
+      const response = await fetch('/api/admin/system-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'listBackups',
+          config: {},
+        }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          setBackupHistory(result.backups);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch backup history:', error);
+    }
+  };
+
   // Create backup
   const createBackup = async () => {
     setLoading(true);
@@ -147,6 +171,8 @@ export default function AdminSettingsPage() {
           title: 'Success',
           description: result.message,
         });
+        // Refresh backup history after creating a backup
+        await fetchBackupHistory();
       } else {
         throw new Error('Failed to create backup');
       }
@@ -161,9 +187,49 @@ export default function AdminSettingsPage() {
     }
   };
 
+  // Delete backup
+  const deleteBackup = async (filename: string) => {
+    if (!confirm(`Are you sure you want to delete the backup "${filename}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await fetch('/api/admin/system-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'deleteBackup',
+          config: { filename },
+        }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        toast({
+          title: 'Success',
+          description: result.message,
+        });
+        // Refresh backup history after deleting a backup
+        await fetchBackupHistory();
+      } else {
+        throw new Error('Failed to delete backup');
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to delete backup',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (activeTab === 'system') {
       fetchSystemConfig();
+      fetchBackupHistory();
     }
   }, [activeTab]);
 
@@ -290,13 +356,55 @@ export default function AdminSettingsPage() {
                   </Button>
                 </div>
                 <div className="p-4 border rounded-lg">
-                  <h4 className="font-medium mb-2">Backup History</h4>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    Recent backups will appear here. In a full implementation, this would show a list of available backups with restore options.
-                  </p>
-                  <div className="mt-2 text-xs text-gray-500">
-                    No backups found
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="font-medium">Backup History</h4>
+                    <Button variant="outline" size="sm" onClick={fetchBackupHistory}>
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Refresh
+                    </Button>
                   </div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                    Recent database backups with download and restore options.
+                  </p>
+                  {backupHistory.length > 0 ? (
+                    <div className="space-y-2">
+                      {backupHistory.map((backup: any, index: number) => (
+                        <div key={index} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                          <div className="flex-1">
+                            <div className="font-medium text-sm">{backup.filename}</div>
+                            <div className="text-xs text-gray-500">
+                              {backup.databaseType} • {backup.sizeFormatted} • {new Date(backup.createdAt).toLocaleString()}
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button variant="outline" size="sm">
+                              <Download className="h-4 w-4 mr-1" />
+                              Download
+                            </Button>
+                            <Button variant="outline" size="sm">
+                              <RefreshCw className="h-4 w-4 mr-1" />
+                              Restore
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                              onClick={() => deleteBackup(backup.filename)}
+                            >
+                              <Trash2 className="h-4 w-4 mr-1" />
+                              Delete
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-gray-500">
+                      <Database className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                      <p className="text-sm">No backups found</p>
+                      <p className="text-xs mt-1">Create your first backup to see it here</p>
+                    </div>
+                  )}
                 </div>
               </div>
             </CardContent>
