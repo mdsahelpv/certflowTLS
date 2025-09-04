@@ -4,7 +4,7 @@ import { db } from '@/lib/db';
 export async function GET(request: NextRequest) {
   try {
     // Get maintenance mode status from database
-    const maintenanceRecord = await db.maintenanceMode.findFirst({
+    const maintenanceRecord = await (db as any).maintenanceMode.findFirst({
       orderBy: { updatedAt: 'desc' }
     });
 
