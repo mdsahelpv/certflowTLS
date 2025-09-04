@@ -296,3 +296,16 @@ model SystemConfig {
 
   @@map("system_configs")
 }
+
+// Maintenance Mode Configuration
+model MaintenanceMode {
+  id                   String   @id @default(cuid())
+  isEnabled            Boolean  @default(false)
+  message              String   @default("System is currently under maintenance. Please try again later.")
+  startTime            DateTime?
+  endTime              DateTime?
+  createdBy            String?
+  updatedAt            DateTime @updatedAt
+
+  @@map("maintenance_mode")
+}
