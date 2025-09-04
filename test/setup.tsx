@@ -2,7 +2,7 @@ import '@testing-library/jest-dom'
 import { TextEncoder, TextDecoder } from 'util'
 
 // Mock environment variables
-process.env.NODE_ENV = 'test'
+(process.env as any).NODE_ENV = 'test'
 process.env.NEXTAUTH_SECRET = 'test-secret-key'
 process.env.ENCRYPTION_KEY = 'test-32-character-encryption-key'
 process.env.DATABASE_URL = 'file:./test.db'
@@ -109,18 +109,10 @@ jest.mock('@/lib/db', () => ({
 }))
 
 // Mock crypto functions
-global.TextEncoder = TextEncoder
+global.TextEncoder = TextEncoder as any
 global.TextDecoder = TextDecoder as any
 
-// Mock fetch with better error handling
-global.fetch = jest.fn(() =>
-  Promise.resolve({
-    ok: true,
-    status: 200,
-    json: () => Promise.resolve({}),
-    text: () => Promise.resolve(''),
-  })
-) as jest.MockedFunction<typeof fetch>
+// Fetch is already mocked in setup-global.ts
 
 // Mock console methods in tests
 const originalConsoleError = console.error

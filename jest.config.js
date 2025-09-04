@@ -38,6 +38,9 @@ const customJestConfig = {
     '<rootDir>/test/**/*.spec.{js,jsx,ts,tsx}',
   ],
   testTimeout: 30000, // 30 seconds for integration tests
+  transformIgnorePatterns: [
+    'node_modules/(?!(node-fetch|text-encoding)/)',
+  ],
 }
 
 // createJestConfig is exported this way to ensure that next/jest can load the Next.js config which is async
