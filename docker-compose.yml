@@ -2,17 +2,20 @@ version: '3.8'
 
 services:
   ca-management:
-    build: 
+    build:
       context: .
       dockerfile: Dockerfile
       target: runner
+      # Enable build cache for faster rebuilds
+      cache_from:
+        - ca-management:latest
     ports:
       - "3000:3000"
     env_file:
       - env.docker
     volumes:
-      - ./logs:/app/logs
-      - ./db:/app/db  # Persist database files
+      - ./logs:/app/logs:rw
+      - ./db:/app/db:rw
     restart: unless-stopped
     depends_on:
       postgres:
@@ -23,6 +26,8 @@ services:
       timeout: 10s
       retries: 3
       start_period: 120s
+      # Disable health check during startup to avoid false failures
+      disable: false
     deploy:
       resources:
         limits:
@@ -31,10 +36,15 @@ services:
         reservations:
           memory: 512M
           cpus: '0.25'
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
     command: >
       sh -c "
         echo '⏳ Waiting for PostgreSQL to be ready...' &&
-        until pg_isready -h postgres -U $POSTGRES_USER -d $POSTGRES_DB; do
+        until pg_isready -h postgres -U \$POSTGRES_USER -d \$POSTGRES_DB; do
           echo 'PostgreSQL is unavailable - sleeping' &&
           sleep 2
         done &&
@@ -46,9 +56,9 @@ services:
         echo '📊 Pushing database schema...' &&
         npx prisma db push &&
         echo '✅ Database initialized! Starting application...' &&
-        echo '🚀 Starting server on port $PORT' &&
+        echo '🚀 Starting server on port \$PORT' &&
         echo '📝 Logs will be available in /app/logs/app.log' &&
-        npx tsx server.ts
+        exec npx tsx server.ts
       "
     environment:
       - PORT=3000
@@ -56,14 +66,24 @@ services:
       - LOG_LEVEL=info
       - LOG_FORMAT=json
       - LOG_FILE=/app/logs/app.log
+      # Node.js performance optimizations
+      - NODE_OPTIONS=--max-old-space-size=512
+    # Security: Drop all capabilities and run as non-root
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:noexec,nosuid,size=100m
 
   postgres:
     image: postgres:14-alpine
     env_file:
       - env.docker
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./db/backups:/backups  # Backup volume
+      - postgres_data:/var/lib/postgresql/data:rw
+      - ./db/backups:/backups:rw
+      # Add PostgreSQL configuration for performance
+      - ./postgres.conf:/etc/postgresql/postgresql.conf:ro
     ports:
       - "5432:5432"
     healthcheck:
@@ -81,6 +101,22 @@ services:
         reservations:
           memory: 256M
           cpus: '0.1'
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+    # PostgreSQL performance optimizations
+    environment:
+      - POSTGRES_SHARED_BUFFERS=128MB
+      - POSTGRES_EFFECTIVE_CACHE_SIZE=256MB
+      - POSTGRES_WORK_MEM=4MB
+      - POSTGRES_MAINTENANCE_WORK_MEM=32MB
+      - POSTGRES_CHECKPOINT_COMPLETION_TARGET=0.9
+      - POSTGRES_WAL_BUFFERS=16MB
+      - POSTGRES_DEFAULT_STATISTICS_TARGET=100
+    command: ["postgres", "-c", "config_file=/etc/postgresql/postgresql.conf"]
+    security_opt:
+      - no-new-privileges:true
 
 volumes:
   postgres_data:

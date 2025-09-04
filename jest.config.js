@@ -7,8 +7,8 @@ const createJestConfig = nextJest({
 
 // Add any custom config to be passed to Jest
 const customJestConfig = {
-  setupFilesAfterEnv: ['<rootDir>/test/setup.tsx'],
-  setupFiles: ['<rootDir>/test/setup-global.ts'],
+  setupFilesAfterEnv: ['<rootDir>/test/setup-global.ts', '<rootDir>/test/setup.tsx'],
+  setupFiles: [],
   testEnvironment: 'jsdom',
   testPathIgnorePatterns: ['<rootDir>/.next/', '<rootDir>/node_modules/', '<rootDir>/e2e/'],
   moduleNameMapper: {
@@ -39,7 +39,7 @@ const customJestConfig = {
   ],
   testTimeout: 30000, // 30 seconds for integration tests
   transformIgnorePatterns: [
-    'node_modules/(?!(node-fetch|text-encoding)/)',
+    'node_modules/(?!(node-fetch|text-encoding|jose|openid-client|next-auth|@auth)/)',
   ],
 }
 

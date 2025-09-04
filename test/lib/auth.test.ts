@@ -38,7 +38,7 @@ describe('AuthService', () => {
       
       const result = await AuthService.hashPassword(password);
       
-      expect(mockedBcrypt.hash).toHaveBeenCalledWith(password, 4);
+      expect(mockedBcrypt.hash).toHaveBeenCalledWith(password, 12);
       expect(result).toBe(hashedPassword);
     });
 
@@ -123,7 +123,7 @@ describe('AuthService', () => {
       
       const result = await AuthService.createUser(userData);
       
-      expect(mockedBcrypt.hash).toHaveBeenCalledWith(userData.password, 4);
+      expect(mockedBcrypt.hash).toHaveBeenCalledWith(userData.password, 12);
       expect(mockedDb.user.create).toHaveBeenCalledWith({
         data: {
           username: userData.username,

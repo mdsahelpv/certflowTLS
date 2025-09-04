@@ -9,13 +9,16 @@ WORKDIR /app
 
 # Install dependencies based on the preferred package manager
 COPY package.json package-lock.json* ./
-RUN npm ci
+RUN npm ci --only=production && npm cache clean --force
 
 # Rebuild the source code only when needed
 FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
-COPY . .
+COPY package.json package-lock.json* ./
+COPY prisma ./prisma
+COPY src ./src
+COPY server.ts next.config.mjs tsconfig.json ./
 
 # Generate Prisma client
 RUN npx prisma generate
@@ -28,40 +31,46 @@ FROM base AS runner
 WORKDIR /app
 
 ENV NODE_ENV production
-# Uncomment the following line in case you want to disable telemetry during runtime.
-# ENV NEXT_TELEMETRY_DISABLED 1
+# Disable Next.js telemetry for privacy
+ENV NEXT_TELEMETRY_DISABLED 1
 
-# Install PostgreSQL client tools for health checks and database initialization
-RUN apk add --no-cache postgresql-client curl
+# Install only essential runtime dependencies
+RUN apk add --no-cache postgresql-client curl dumb-init && \
+    rm -rf /var/cache/apk/*
 
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
+# Create non-root user for security
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 nextjs
 
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/server.ts ./server.ts
-COPY --from=builder /app/src ./src
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/next.config.mjs ./next.config.mjs
-COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/create-admin.js ./create-admin.js
-COPY --from=builder /app/tsconfig.json ./tsconfig.json
+# Copy package files for production dependencies
+COPY package.json package-lock.json* ./
 
-# Set the correct permission for prerender cache
-RUN mkdir .next
-RUN chown nextjs:nodejs .next
+# Install only production dependencies
+RUN npm ci --only=production && npm cache clean --force
 
-# Keep Next build artifacts for server rendering
+# Copy runtime files
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/server.ts ./server.ts
+COPY --from=builder --chown=nextjs:nodejs /app/src ./src
+COPY --from=builder --chown=nextjs:nodejs /app/next.config.mjs ./next.config.mjs
+COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
+COPY --from=builder --chown=nextjs:nodejs /app/create-admin.js ./create-admin.js
+
+# Copy Next.js build artifacts
 COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
 
-RUN chown -R nextjs:nodejs /app
+# Create necessary directories with correct permissions
+RUN mkdir -p /app/logs /app/db && \
+    chown -R nextjs:nodejs /app
 
+# Switch to non-root user
 USER nextjs
 
 EXPOSE 3000
 
 ENV PORT 3000
-# set hostname to localhost
 ENV HOSTNAME "0.0.0.0"
 
-# Default command (can be overridden by docker-compose)
+# Use dumb-init for proper signal handling
+ENTRYPOINT ["dumb-init", "--"]
 CMD ["npx", "tsx", "server.ts"]
