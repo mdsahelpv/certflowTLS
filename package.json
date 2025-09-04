@@ -146,10 +146,13 @@
     "jest": "^30.0.5",
     "jest-environment-jsdom": "^30.0.5",
     "next": "15.3.5",
+    "node-fetch": "^3.3.2",
     "nodemon": "^3.1.10",
     "tailwindcss": "^4",
+    "text-encoding": "^0.7.0",
     "ts-jest": "^29.4.1",
     "tw-animate-css": "^1.3.5",
-    "typescript": "5.9.2"
+    "typescript": "5.9.2",
+    "undici": "^7.15.0"
   }
 }

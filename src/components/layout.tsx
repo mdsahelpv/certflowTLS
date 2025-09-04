@@ -7,16 +7,19 @@ import SignInPage from '../app/auth/signin/page';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
-import { 
-  Shield, 
-  Activity, 
+import { useTheme } from 'next-themes';
+import {
+  Shield,
+  Activity,
   Bell,
   Users,
   Settings,
   LogOut,
   ChevronDown,
   User,
-  CheckCircle
+  CheckCircle,
+  Sun,
+  Moon
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -35,7 +38,8 @@ interface LayoutProps {
 
 export default function Layout({ children }: LayoutProps) {
   const pathname = usePathname();
-  
+  const { theme, setTheme } = useTheme();
+
   // Use custom auth hook
   const { session, isAuthenticated, isLoading } = useAuth();
 
@@ -48,10 +52,8 @@ export default function Layout({ children }: LayoutProps) {
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-        <div className="flex items-center gap-2">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          <span>Loading...</span>
-        </div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-600"></div>
+        <span>Loading...</span>
       </div>
     );
   }
@@ -78,14 +80,14 @@ export default function Layout({ children }: LayoutProps) {
                 <span className="font-semibold">CA Management</span>
               </Link>
               <Link href="/dashboard">
-                <Button variant="outline" size="sm">Home</Button>
+                <Button variant="outline" size="sm" className="transition-all duration-300 hover:scale-105 hover:shadow-md hover:bg-gray-100 dark:hover:bg-gray-700">Home</Button>
               </Link>
             </div>
 
             <div className="flex items-center space-x-2 ml-auto">
               {permissions.includes('audit:view') && (
                 <Link href="/audit">
-                  <Button variant="ghost" size="sm" className="hidden md:inline-flex">
+                  <Button variant="ghost" size="sm" className="hidden md:inline-flex transition-all duration-300 hover:scale-105 hover:shadow-md hover:bg-gray-100 dark:hover:bg-gray-700">
                     <Activity className="h-4 w-4 mr-2" />
                     Activity Log
                   </Button>
@@ -93,7 +95,7 @@ export default function Layout({ children }: LayoutProps) {
               )}
               {permissions.includes('config:manage') && (
                 <Link href="/notifications">
-                  <Button variant="ghost" size="sm" className="hidden md:inline-flex">
+                  <Button variant="ghost" size="sm" className="hidden md:inline-flex transition-all duration-300 hover:scale-105 hover:shadow-md hover:bg-gray-100 dark:hover:bg-gray-700">
                     <Bell className="h-4 w-4 mr-2" />
                     Notifications
                   </Button>
@@ -102,7 +104,7 @@ export default function Layout({ children }: LayoutProps) {
               {/* Show Validate for users with certificate:validate or certificate:view permission */}
               {(permissions.includes('certificate:validate') || permissions.includes('certificate:view')) && (
                 <Link href="/certificates/validate">
-                  <Button variant="ghost" size="sm" className="hidden md:inline-flex">
+                  <Button variant="ghost" size="sm" className="hidden md:inline-flex transition-all duration-300 hover:scale-105 hover:shadow-md hover:bg-gray-100 dark:hover:bg-gray-700">
                     <CheckCircle className="h-4 w-4 mr-2" />
                     Validate
                   </Button>
@@ -110,7 +112,7 @@ export default function Layout({ children }: LayoutProps) {
               )}
               {permissions.includes('ca:manage') && (
                 <Link href="/ca/setup">
-                  <Button variant="ghost" size="sm" className="hidden md:inline-flex">
+                  <Button variant="ghost" size="sm" className="hidden md:inline-flex transition-all duration-300 hover:scale-105 hover:shadow-md hover:bg-gray-100 dark:hover:bg-gray-700">
                     <Shield className="h-4 w-4 mr-2" />
                     CA Management
                   </Button>
@@ -147,6 +149,14 @@ export default function Layout({ children }: LayoutProps) {
                       <span>Profile</span>
                     </Link>
                   </DropdownMenuItem>
+                  {permissions.includes('config:manage') && (
+                    <DropdownMenuItem asChild>
+                      <Link href="/admin/settings" className="flex items-center gap-2">
+                        <Settings className="h-4 w-4" />
+                        <span>Admin Settings</span>
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
                   {permissions.includes('user:manage') && (
                     <DropdownMenuItem asChild>
                       <Link href="/users" className="flex items-center gap-2">
@@ -155,6 +165,14 @@ export default function Layout({ children }: LayoutProps) {
                       </Link>
                     </DropdownMenuItem>
                   )}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                    className="flex items-center gap-2"
+                  >
+                    {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                    <span>Toggle Theme</span>
+                  </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     onSelect={(e) => {

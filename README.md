@@ -95,7 +95,7 @@ npm install
 
 Create the database directory and push the schema:
 ```bash
-mkdir -p db logs
+mkdir logs
 npx prisma generate
 npx prisma db push
 ```
@@ -104,7 +104,7 @@ npx prisma db push
 Set your desired administrator credentials as environment variables and run the user creation script.
 ```bash
 export ADMIN_USERNAME=admin
-export ADMIN_PASSWORD=your_secure_password
+export ADMIN_PASSWORD=admin123
 node create-admin.js
 ```
 *Note: You can unset these variables after the script runs with `unset ADMIN_USERNAME ADMIN_PASSWORD`.*
