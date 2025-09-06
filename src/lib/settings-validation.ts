@@ -416,6 +416,27 @@ export const performanceMetricsConfigSchema = z.object({
   memoryThreshold: z.number().min(1).max(100),
   diskThreshold: z.number().min(1).max(100),
   responseTimeThreshold: z.number().min(100).max(30000),
+  networkThreshold: z.number().min(1).max(1000), // MB/s
+  databaseConnectionThreshold: z.number().min(1).max(1000),
+  alertSettings: z.object({
+    enabled: z.boolean(),
+    cpuAlertThreshold: z.number().min(1).max(100),
+    memoryAlertThreshold: z.number().min(1).max(100),
+    diskAlertThreshold: z.number().min(1).max(100),
+    responseTimeAlertThreshold: z.number().min(100).max(30000),
+    consecutiveFailuresThreshold: z.number().min(1).max(10),
+    alertRecipients: z.array(z.string().email()).optional()
+  }),
+  metrics: z.array(z.object({
+    name: z.string().min(1).max(100),
+    type: z.enum(['cpu', 'memory', 'disk', 'network', 'database', 'response_time', 'custom']),
+    enabled: z.boolean(),
+    collectionIntervalSeconds: z.number().min(1).max(3600),
+    aggregationMethod: z.enum(['average', 'min', 'max', 'sum', 'count']),
+    retentionHours: z.number().min(1).max(8760), // 1 year
+    alertThreshold: z.number().optional(),
+    unit: z.string().optional()
+  })).min(1)
 });
 
 export type PerformanceMetricsConfig = z.infer<typeof performanceMetricsConfigSchema>;
