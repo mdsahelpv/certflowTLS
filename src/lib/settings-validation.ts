@@ -555,6 +555,99 @@ export const notificationSettingsSchema = z.object({
   }).optional()
 });
 
+// Alert Threshold Configuration Validation
+export const alertThresholdSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1).max(100),
+  description: z.string().max(500),
+  enabled: z.boolean(),
+  metricType: z.enum([
+    'cpu_usage',
+    'memory_usage',
+    'disk_usage',
+    'network_traffic',
+    'response_time',
+    'error_rate',
+    'certificate_expiry',
+    'security_events',
+    'system_health',
+    'custom'
+  ]),
+  condition: z.enum(['greater_than', 'less_than', 'equals', 'not_equals', 'contains', 'not_contains']),
+  threshold: z.union([z.number(), z.string()]),
+  unit: z.string().optional(),
+  severity: z.enum(['low', 'medium', 'high', 'critical']),
+  evaluationPeriod: z.number().min(1).max(3600), // seconds
+  cooldownPeriod: z.number().min(60).max(86400), // seconds
+  autoResolve: z.boolean(),
+  resolveThreshold: z.union([z.number(), z.string()]).optional(),
+  notificationChannels: z.array(z.enum(['email', 'webhook', 'slack', 'sms'])),
+  customMessage: z.string().optional(),
+  tags: z.record(z.string(), z.string()).optional(),
+  createdAt: z.date().optional(),
+  updatedAt: z.date().optional()
+});
+
+// Alert Escalation Rule Validation
+export const alertEscalationRuleSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1).max(100),
+  enabled: z.boolean(),
+  triggerConditions: z.array(z.object({
+    severity: z.enum(['low', 'medium', 'high', 'critical']),
+    timeUnacknowledged: z.number().min(60).max(86400), // seconds
+    repeatCount: z.number().min(1).max(100).optional()
+  })),
+  escalationSteps: z.array(z.object({
+    step: z.number().min(1).max(10),
+    delayMinutes: z.number().min(1).max(1440),
+    channels: z.array(z.enum(['email', 'webhook', 'slack', 'sms'])),
+    recipients: z.array(z.string()),
+    message: z.string().optional(),
+    escalateTo: z.string().optional() // user or group ID
+  })),
+  maxEscalationLevel: z.number().min(1).max(10),
+  createdAt: z.date().optional(),
+  updatedAt: z.date().optional()
+});
+
+// Alert History Entry Validation
+export const alertHistorySchema = z.object({
+  id: z.string().min(1),
+  alertId: z.string(),
+  action: z.enum([
+    'created',
+    'acknowledged',
+    'resolved',
+    'escalated',
+    'suppressed',
+    'commented',
+    'assigned'
+  ]),
+  userId: z.string().optional(),
+  username: z.string().optional(),
+  timestamp: z.date(),
+  details: z.record(z.string(), z.any()).optional(),
+  message: z.string().optional()
+});
+
+// Alert Suppression Rule Validation
+export const alertSuppressionRuleSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1).max(100),
+  enabled: z.boolean(),
+  conditions: z.array(z.object({
+    field: z.string(),
+    operator: z.enum(['equals', 'not_equals', 'contains', 'not_contains', 'regex']),
+    value: z.string()
+  })),
+  duration: z.number().min(300).max(604800), // 5 minutes to 1 week
+  reason: z.string().max(500),
+  createdBy: z.string(),
+  createdAt: z.date().optional(),
+  expiresAt: z.date().optional()
+});
+
 export type SMTPConfig = z.infer<typeof smtpConfigSchema>;
 
 export function validateSMTPConfig(config: any): { isValid: boolean; errors: string[] } {
