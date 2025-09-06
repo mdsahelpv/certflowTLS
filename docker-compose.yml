@@ -26,8 +26,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 120s
-      # Disable health check during startup to avoid false failures
-      disable: false
     deploy:
       resources:
         limits:
