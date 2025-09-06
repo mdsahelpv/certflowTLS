@@ -60,11 +60,11 @@ This document outlines the complete implementation plan to make the admin settin
 - [x] **Add template validation**
 
 ### 3.3 CRL Settings API
-- [ ] **Create CRL configuration storage**
-- [ ] **Implement CRL generation scheduling**
-- [ ] **Add distribution point management**
-- [ ] **Create CRL validation utilities**
-- [ ] **Implement CRL update notifications**
+- [x] **Create CRL configuration storage**
+- [x] **Implement CRL generation scheduling**
+- [x] **Add distribution point management**
+- [x] **Create CRL validation utilities**
+- [x] **Implement CRL update notifications**
 
 ### 3.4 OCSP Settings API
 - [ ] **Create OCSP responder configuration**

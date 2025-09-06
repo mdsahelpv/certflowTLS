@@ -289,9 +289,26 @@ export function validateCRLGenerationRequest(request: any): { isValid: boolean; 
 // OCSP Settings Validation
 export const ocspSettingsSchema = z.object({
   enabled: z.boolean(),
+  autoGenerate: z.boolean(),
   responderUrl: z.string().url(),
+  backupResponderUrls: z.array(z.string().url()).optional(),
   cacheTimeoutMinutes: z.number().min(5).max(1440),
+  maxCacheSize: z.number().min(100).max(10000), // Max cached responses
   includeNextUpdate: z.boolean(),
+  includeSingleExtensions: z.boolean(),
+  responseTimeoutSeconds: z.number().min(5).max(300),
+  monitoringSettings: z.object({
+    enabled: z.boolean(),
+    responseTimeThreshold: z.number().min(100).max(30000),
+    failureThreshold: z.number().min(1).max(10),
+    alertRecipients: z.array(z.string().email()).optional()
+  }),
+  securitySettings: z.object({
+    signResponses: z.boolean(),
+    responseSigningKey: z.string().optional(),
+    includeCertId: z.boolean(),
+    nonceSupport: z.boolean()
+  })
 });
 
 export type OCSPSettings = z.infer<typeof ocspSettingsSchema>;
@@ -308,6 +325,33 @@ export function validateOCSPSettings(settings: any): { isValid: boolean; errors:
       };
     }
     return { isValid: false, errors: ['Invalid OCSP settings format'] };
+  }
+}
+
+// OCSP Request Validation
+export const ocspRequestSchema = z.object({
+  serialNumber: z.string().min(1),
+  issuerNameHash: z.string(),
+  issuerKeyHash: z.string(),
+  hashAlgorithm: z.enum(['sha1', 'sha256', 'sha384', 'sha512']).optional(),
+  nonce: z.string().optional(),
+  serviceLocator: z.string().url().optional()
+});
+
+export type OCSPRequest = z.infer<typeof ocspRequestSchema>;
+
+export function validateOCSPRequest(request: any): { isValid: boolean; errors: string[] } {
+  try {
+    ocspRequestSchema.parse(request);
+    return { isValid: true, errors: [] };
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return {
+        isValid: false,
+        errors: error.issues.map(err => `${err.path.join('.')}: ${err.message}`)
+      };
+    }
+    return { isValid: false, errors: ['Invalid OCSP request format'] };
   }
 }
 
@@ -540,6 +584,7 @@ export const SettingsValidation = {
   validateCRLSettings,
   validateCRLGenerationRequest,
   validateOCSPSettings,
+  validateOCSPRequest,
   validateHealthCheckConfig,
   validatePerformanceMetricsConfig,
   validateResourceLimitsConfig,
