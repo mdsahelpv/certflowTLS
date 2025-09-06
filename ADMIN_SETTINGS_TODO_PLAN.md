@@ -46,11 +46,11 @@ This document outlines the complete implementation plan to make the admin settin
 ## Phase 3: Certificate Authority Settings API
 
 ### 3.1 CA Renewal Policy API
-- [ ] **Create CA renewal configuration storage**
-- [ ] **Implement auto-renewal logic**
-- [ ] **Add renewal threshold monitoring**
-- [ ] **Create renewal notification system**
-- [ ] **Add renewal attempt tracking**
+- [x] **Create CA renewal configuration storage**
+- [x] **Implement auto-renewal logic**
+- [x] **Add renewal threshold monitoring**
+- [x] **Create renewal notification system**
+- [x] **Add renewal attempt tracking**
 
 ### 3.2 Certificate Templates API
 - [ ] **Implement certificate template storage**

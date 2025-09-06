@@ -122,10 +122,47 @@ export function validateCARenewalPolicy(policy: any): { isValid: boolean; errors
 
 // Certificate Template Validation
 export const certificateTemplateSchema = z.object({
+  name: z.string().min(1).max(100),
+  description: z.string().max(500),
+  enabled: z.boolean(),
   defaultValidityDays: z.number().min(30).max(3650),
   defaultKeySize: z.enum(['1024', '2048', '3072', '4096']),
   defaultAlgorithm: z.enum(['RSA', 'ECDSA']),
   allowCustomExtensions: z.boolean(),
+  keyUsage: z.array(z.enum([
+    'digitalSignature',
+    'nonRepudiation',
+    'keyEncipherment',
+    'dataEncipherment',
+    'keyAgreement',
+    'keyCertSign',
+    'crlSign',
+    'encipherOnly',
+    'decipherOnly'
+  ])).min(1),
+  extendedKeyUsage: z.array(z.enum([
+    'serverAuth',
+    'clientAuth',
+    'codeSigning',
+    'emailProtection',
+    'timeStamping',
+    'msCodeInd',
+    'msCodeCom',
+    'msCTLSign',
+    'msSGC',
+    'msEFS',
+    'nsSGC'
+  ])).optional(),
+  subjectAlternativeNames: z.boolean(),
+  basicConstraints: z.object({
+    ca: z.boolean(),
+    pathLenConstraint: z.number().min(0).max(10).optional()
+  }).optional(),
+  customExtensions: z.array(z.object({
+    oid: z.string().regex(/^(\d+\.)*\d+$/),
+    critical: z.boolean(),
+    value: z.string()
+  })).optional()
 });
 
 export type CertificateTemplate = z.infer<typeof certificateTemplateSchema>;
@@ -142,6 +179,35 @@ export function validateCertificateTemplate(template: any): { isValid: boolean; 
       };
     }
     return { isValid: false, errors: ['Invalid certificate template format'] };
+  }
+}
+
+// Certificate Template Collection Validation
+export const certificateTemplateCollectionSchema = z.object({
+  templates: z.array(certificateTemplateSchema).min(1),
+  defaultTemplate: z.string().min(1),
+  allowCustomTemplates: z.boolean(),
+  templateValidation: z.object({
+    requireKeyUsage: z.boolean(),
+    enforceAlgorithmCompliance: z.boolean(),
+    validateExtensions: z.boolean()
+  })
+});
+
+export type CertificateTemplateCollection = z.infer<typeof certificateTemplateCollectionSchema>;
+
+export function validateCertificateTemplateCollection(collection: any): { isValid: boolean; errors: string[] } {
+  try {
+    certificateTemplateCollectionSchema.parse(collection);
+    return { isValid: true, errors: [] };
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return {
+        isValid: false,
+        errors: error.issues.map(err => `${err.path.join('.')}: ${err.message}`)
+      };
+    }
+    return { isValid: false, errors: ['Invalid certificate template collection format'] };
   }
 }
 
@@ -420,6 +486,7 @@ export const SettingsValidation = {
   validateAuditConfig,
   validateCARenewalPolicy,
   validateCertificateTemplate,
+  validateCertificateTemplateCollection,
   validateCRLSettings,
   validateOCSPSettings,
   validateHealthCheckConfig,
