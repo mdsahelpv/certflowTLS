@@ -3,7 +3,6 @@ import { getToken } from 'next-auth/jwt';
 import type { NextRequest } from 'next/server';
 import { securityMiddleware } from './middleware-security';
 import { logger } from '@/lib/logger-edge';
-import { db } from '@/lib/db';
 
 export async function middleware(request: NextRequest) {
   const startTime = Date.now();
@@ -30,35 +29,15 @@ export async function middleware(request: NextRequest) {
     return securityResponse;
   }
 
-  // Check maintenance mode - redirect to maintenance page if enabled
-  try {
-    // Use raw query to avoid TypeScript issues with new schema
-    const maintenanceRecord = await (db as any).maintenanceMode.findFirst({
-      orderBy: { updatedAt: 'desc' }
+  // Check maintenance mode - use environment variable (database not available in Edge Runtime)
+  const isMaintenanceMode = process.env.MAINTENANCE_MODE === 'true';
+  if (isMaintenanceMode && !pathname.startsWith('/maintenance') && !pathname.startsWith('/api/maintenance')) {
+    logger.info('Maintenance mode active - redirecting to maintenance page', {
+      requestId,
+      originalPath: pathname
     });
 
-    const isMaintenanceMode = maintenanceRecord?.isEnabled || false;
-
-    // Allow access to maintenance page and API routes during maintenance
-    if (isMaintenanceMode && !pathname.startsWith('/maintenance') && !pathname.startsWith('/api/maintenance')) {
-      logger.info('Maintenance mode active - redirecting to maintenance page', {
-        requestId,
-        originalPath: pathname
-      });
-
-      return NextResponse.redirect(new URL('/maintenance', request.url));
-    }
-  } catch (error) {
-    // If database is unavailable, fallback to environment variable
-    const isMaintenanceMode = process.env.MAINTENANCE_MODE === 'true';
-    if (isMaintenanceMode && !pathname.startsWith('/maintenance') && !pathname.startsWith('/api/maintenance')) {
-      logger.info('Maintenance mode active (fallback) - redirecting to maintenance page', {
-        requestId,
-        originalPath: pathname
-      });
-
-      return NextResponse.redirect(new URL('/maintenance', request.url));
-    }
+    return NextResponse.redirect(new URL('/maintenance', request.url));
   }
 
   // Check if user is authenticated for protected routes

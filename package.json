@@ -6,7 +6,7 @@
     "dev": "PORT=3000 next dev",
     "dev:custom": "PORT=3000 nodemon --exec \"npx tsx server.ts\" --watch server.ts --watch src --ext ts,tsx,js,jsx 2>&1 | tee dev.log",
     "build": "next build",
-    "start": "PORT=3000 NODE_ENV=production tsx start.js 2>&1 | tee server.log",
+    "start": "PORT=3000 NODE_ENV=production npx tsx start.js 2>&1 | tee server.log",
     "lint": "next lint",
     "lint:fix": "next lint --fix",
     "setup:sqlite": "node -e \"const fs = require('fs'); const path = require('path'); if (!fs.existsSync('.env')) { fs.copyFileSync('env.sqlite', '.env'); console.log('SQLite environment file created!'); } else { console.log('Environment file already exists'); } if (!fs.existsSync('db')) { fs.mkdirSync('db'); console.log('Database directory created!'); } console.log('SQLite setup complete! Please edit .env file and run: npm run db:push:sqlite');",

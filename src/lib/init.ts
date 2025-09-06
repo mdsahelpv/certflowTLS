@@ -101,7 +101,37 @@ export class SystemInitializer {
 
       // Create self-signed CA certificate using forge with minimal CA extensions (basicConstraints, keyUsage, SKI/AKI)
       const cert = forge.pki.createCertificate();
-      cert.publicKey = forge.pki.publicKeyFromPem(publicKey) as any;
+
+      // Convert Node.js SPKI format to node-forge compatible format
+      let forgePublicKey: any;
+      let forgePrivateKey: any;
+
+      try {
+        // For RSA keys, convert from PKCS#8 to PKCS#1 format that node-forge expects
+        if (keyAlgorithm === 'RSA') {
+          // Load the private key and extract public key in node-forge format
+          const pkcs8PrivateKey = forge.pki.privateKeyFromPem(privateKey);
+          const rsaPrivateKey = pkcs8PrivateKey as forge.pki.rsa.PrivateKey;
+
+          // Create RSA public key from the private key
+          const rsaPublicKey = forge.pki.rsa.setPublicKey(rsaPrivateKey.n, rsaPrivateKey.e);
+          forgePublicKey = rsaPublicKey;
+          forgePrivateKey = rsaPrivateKey;
+        } else {
+          // For other algorithms, use the PEM directly
+          forgePublicKey = forge.pki.publicKeyFromPem(publicKey);
+          forgePrivateKey = forge.pki.privateKeyFromPem(privateKey);
+        }
+
+        cert.publicKey = forgePublicKey;
+      } catch (keyError) {
+        logger.ca.error('Failed to convert key formats for node-forge', {
+          error: keyError instanceof Error ? keyError.message : String(keyError),
+          algorithm: keyAlgorithm
+        });
+        throw new Error('Key format conversion failed');
+      }
+
       cert.serialNumber = new forge.jsbn.BigInteger(forge.util.bytesToHex(forge.random.getBytesSync(16)), 16).toString(16);
       const now = new Date();
       cert.validity.notBefore = now;
@@ -116,7 +146,7 @@ export class SystemInitializer {
       if (subjectParts.CN) attrs.push({ name: 'commonName', value: subjectParts.CN });
       cert.setSubject(attrs);
       cert.setIssuer(attrs);
-      const privKey = forge.pki.privateKeyFromPem(privateKey) as any;
+
       // Compute Subject Key Identifier from public key
       try {
         const publicKeyDer = forge.asn1.toDer(forge.pki.publicKeyToAsn1(cert.publicKey)).getBytes();
@@ -130,8 +160,19 @@ export class SystemInitializer {
           { name: 'authorityKeyIdentifier', value: { keyIdentifier: skiBytes }, critical: false },
         ];
         try { cert.setExtensions(extensions as any); } catch {}
-      } catch {}
-      cert.sign(privKey, forge.md.sha256.create());
+      } catch (extensionError) {
+        logger.ca.warn('Failed to set certificate extensions, using minimal extensions', {
+          error: extensionError instanceof Error ? extensionError.message : String(extensionError)
+        });
+        // Fallback to minimal extensions
+        const minimalExtensions: any[] = [
+          { name: 'basicConstraints', value: { cA: true }, critical: true },
+          { name: 'keyUsage', value: { keyCertSign: true, cRLSign: true }, critical: true },
+        ];
+        try { cert.setExtensions(minimalExtensions as any); } catch {}
+      }
+
+      cert.sign(forgePrivateKey, forge.md.sha256.create());
       const certificate = forge.pki.certificateToPem(cert);
 
       const notBefore = cert.validity.notBefore;
