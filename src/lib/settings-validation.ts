@@ -648,6 +648,164 @@ export const alertSuppressionRuleSchema = z.object({
   expiresAt: z.date().optional()
 });
 
+// Webhook Configuration Validation
+export const webhookConfigSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1).max(100),
+  description: z.string().max(500),
+  enabled: z.boolean(),
+  url: z.string().url(),
+  method: z.enum(['GET', 'POST', 'PUT', 'PATCH']),
+  headers: z.record(z.string(), z.string()).optional(),
+  authentication: z.object({
+    type: z.enum(['none', 'basic', 'bearer', 'api_key', 'custom']),
+    username: z.string().optional(),
+    password: z.string().optional(),
+    token: z.string().optional(),
+    apiKey: z.string().optional(),
+    customHeader: z.string().optional(),
+    customValue: z.string().optional()
+  }).optional(),
+  payload: z.record(z.string(), z.any()).optional(),
+  retryPolicy: z.object({
+    enabled: z.boolean(),
+    maxRetries: z.number().min(0).max(10),
+    retryDelay: z.number().min(100).max(30000), // milliseconds
+    backoffMultiplier: z.number().min(1).max(5)
+  }).optional(),
+  timeout: z.number().min(1000).max(60000), // milliseconds
+  events: z.array(z.enum([
+    'alert_created',
+    'alert_acknowledged',
+    'alert_resolved',
+    'alert_escalated',
+    'certificate_expiring',
+    'certificate_expired',
+    'system_health_changed',
+    'performance_threshold_exceeded',
+    'security_event',
+    'user_action'
+  ])),
+  filters: z.array(z.object({
+    field: z.string(),
+    operator: z.enum(['equals', 'not_equals', 'contains', 'not_contains', 'regex', 'greater_than', 'less_than']),
+    value: z.string()
+  })).optional(),
+  rateLimit: z.object({
+    enabled: z.boolean(),
+    requestsPerMinute: z.number().min(1).max(1000),
+    burstLimit: z.number().min(1).max(100)
+  }).optional(),
+  createdAt: z.date().optional(),
+  updatedAt: z.date().optional(),
+  createdBy: z.string().optional(),
+  updatedBy: z.string().optional()
+});
+
+// External Service Integration Validation
+export const externalIntegrationSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1).max(100),
+  type: z.enum(['slack', 'teams', 'pagerduty', 'servicenow', 'jira', 'webhook', 'custom']),
+  enabled: z.boolean(),
+  configuration: z.record(z.string(), z.any()),
+  authentication: z.object({
+    type: z.enum(['oauth2', 'api_key', 'basic', 'bearer', 'webhook_secret']),
+    credentials: z.record(z.string(), z.string())
+  }),
+  mappings: z.array(z.object({
+    sourceField: z.string(),
+    targetField: z.string(),
+    transformation: z.string().optional()
+  })).optional(),
+  syncSettings: z.object({
+    enabled: z.boolean(),
+    intervalMinutes: z.number().min(1).max(1440),
+    bidirectional: z.boolean(),
+    conflictResolution: z.enum(['source_wins', 'target_wins', 'manual'])
+  }).optional(),
+  createdAt: z.date().optional(),
+  updatedAt: z.date().optional(),
+  createdBy: z.string().optional(),
+  updatedBy: z.string().optional()
+});
+
+// API Rate Limiting Configuration Validation
+export const rateLimitConfigSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1).max(100),
+  enabled: z.boolean(),
+  strategy: z.enum(['fixed_window', 'sliding_window', 'token_bucket', 'leaky_bucket']),
+  windowSize: z.number().min(1).max(86400), // seconds
+  maxRequests: z.number().min(1).max(100000),
+  burstLimit: z.number().min(1).max(10000).optional(),
+  refillRate: z.number().min(1).max(10000).optional(),
+  scope: z.enum(['global', 'user', 'ip', 'endpoint']),
+  endpoints: z.array(z.string()).optional(),
+  userGroups: z.array(z.string()).optional(),
+  ipRanges: z.array(z.string()).optional(),
+  responseHeaders: z.object({
+    enabled: z.boolean(),
+    limitHeader: z.string().optional(),
+    remainingHeader: z.string().optional(),
+    resetHeader: z.string().optional()
+  }).optional(),
+  violationResponse: z.object({
+    statusCode: z.number().min(400).max(599),
+    message: z.string(),
+    retryAfter: z.boolean()
+  }).optional(),
+  createdAt: z.date().optional(),
+  updatedAt: z.date().optional(),
+  createdBy: z.string().optional(),
+  updatedBy: z.string().optional()
+});
+
+// Integration Monitoring Configuration Validation
+export const integrationMonitoringSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1).max(100),
+  type: z.enum(['webhook', 'api', 'external_service', 'database']),
+  enabled: z.boolean(),
+  endpoint: z.string().url().optional(),
+  monitoringConfig: z.object({
+    intervalSeconds: z.number().min(10).max(3600),
+    timeoutSeconds: z.number().min(5).max(300),
+    retryAttempts: z.number().min(0).max(5),
+    successThreshold: z.number().min(1).max(10),
+    failureThreshold: z.number().min(1).max(10)
+  }),
+  healthChecks: z.array(z.object({
+    name: z.string().min(1).max(100),
+    type: z.enum(['http', 'tcp', 'custom']),
+    endpoint: z.string().optional(),
+    port: z.number().min(1).max(65535).optional(),
+    expectedStatus: z.number().min(100).max(599).optional(),
+    expectedResponse: z.string().optional(),
+    headers: z.record(z.string(), z.string()).optional()
+  })).optional(),
+  alerts: z.object({
+    enabled: z.boolean(),
+    failureAlert: z.boolean(),
+    recoveryAlert: z.boolean(),
+    degradedAlert: z.boolean(),
+    channels: z.array(z.enum(['email', 'webhook', 'slack', 'sms']))
+  }).optional(),
+  metrics: z.array(z.object({
+    name: z.string().min(1).max(100),
+    type: z.enum(['response_time', 'success_rate', 'error_rate', 'throughput', 'custom']),
+    unit: z.string().optional(),
+    thresholds: z.object({
+      warning: z.number().optional(),
+      critical: z.number().optional()
+    }).optional()
+  })).optional(),
+  createdAt: z.date().optional(),
+  updatedAt: z.date().optional(),
+  createdBy: z.string().optional(),
+  updatedBy: z.string().optional()
+});
+
 export type SMTPConfig = z.infer<typeof smtpConfigSchema>;
 
 export function validateSMTPConfig(config: any): { isValid: boolean; errors: string[] } {
@@ -665,18 +823,6 @@ export function validateSMTPConfig(config: any): { isValid: boolean; errors: str
   }
 }
 
-// Webhook Configuration Validation
-export const webhookConfigSchema = z.object({
-  url: z.string().url(),
-  timeout: z.number().min(1000).max(30000),
-  retries: z.number().min(0).max(10),
-  retryDelay: z.number().min(100).max(30000),
-  secret: z.string().min(16),
-  headers: z.record(z.string(), z.string()).optional(),
-});
-
-export type WebhookConfig = z.infer<typeof webhookConfigSchema>;
-
 export function validateWebhookConfig(config: any): { isValid: boolean; errors: string[] } {
   try {
     webhookConfigSchema.parse(config);
@@ -691,6 +837,8 @@ export function validateWebhookConfig(config: any): { isValid: boolean; errors: 
     return { isValid: false, errors: ['Invalid webhook configuration format'] };
   }
 }
+
+
 
 
 
