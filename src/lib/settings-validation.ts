@@ -866,14 +866,18 @@ export function validateSystemConfig(key: string, value: any): { isValid: boolea
 
   if (key.includes('url') || key.includes('endpoint')) {
     try {
-      new URL(value);
+      const url = new URL(value);
+      // More strict validation - require http/https protocol and valid hostname
+      if (!url.protocol || !['http:', 'https:'].includes(url.protocol) || !url.hostname || url.hostname.length < 3) {
+        throw new Error('Invalid URL');
+      }
     } catch {
       errors.push(`${key} must be a valid URL`);
     }
   }
 
   if (key.includes('email')) {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
     if (!emailRegex.test(value)) {
       errors.push(`${key} must be a valid email address`);
     }

@@ -17,7 +17,7 @@
     "db:studio": "prisma studio",
     "db:studio:sqlite": "cp prisma/schema.prisma prisma/schema.prisma.backup && cp prisma/schema.sqlite prisma/schema.prisma && prisma studio && cp prisma/schema.prisma.backup prisma/schema.prisma",
     "test": "npm run test:setup && jest",
-    "test:setup": "cp prisma/schema.sqlite prisma/schema.prisma && npx prisma generate && npx prisma db push --force-reset",
+    "test:setup": "npx prisma generate --schema=prisma/schema.prisma && npx prisma db push --force-reset --schema=prisma/schema.prisma",
     "test:watch": "npm run test:setup && jest --watch",
     "test:coverage": "npm run test:setup && jest --coverage",
     "test:update": "npm run test:setup && jest --updateSnapshot",
