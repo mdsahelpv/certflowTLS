@@ -1,8 +1,8 @@
-# Admin Settings Documentation
+# 🔧 Admin Settings Configuration Guide
 
-## Overview
+**Complete guide for configuring and managing system-wide settings**
 
-The Admin Settings system provides a comprehensive web-based interface for configuring system-wide settings, security policies, certificate authority management, and performance monitoring. This documentation covers the complete implementation, API endpoints, and usage guidelines.
+📖 **Quick Reference**: See [README.md](../README.md) for system overview and setup
 
 ## Architecture
 
@@ -195,24 +195,282 @@ src/
 - **Compliance Reporting**: Audit logs for regulatory compliance
 - **Data Retention**: Configurable log retention policies
 
-## Usage Guidelines
+## 📖 Admin Settings User Guide
 
-### For Administrators
+### 🚀 Quick Start for Administrators
 
-1. **Access Settings**: Navigate to Admin Settings from the user dropdown menu
-2. **Permission Requirements**: Must have `config:manage` permission
-3. **Tab Navigation**: Use tabs to access different configuration sections
-4. **Save Changes**: Click "Save" buttons to persist configuration changes
-5. **Backup Operations**: Use "Create Backup" for database backups
-6. **Monitor Changes**: Review audit logs for configuration change history
+#### Step 1: Access Admin Settings
+1. **Login** as an administrator user
+2. **Click your profile** in the top-right corner
+3. **Select "Admin Settings"** from the dropdown menu
+4. **Navigate through tabs** to configure different system aspects
 
-### For Developers
+#### Step 2: Initial Security Setup (Critical First Steps)
+```bash
+# Recommended initial security configuration
+PASSWORD_MIN_LENGTH=12
+PASSWORD_REQUIRE_SPECIAL_CHARS=true
+SESSION_TIMEOUT_MINUTES=30
+MFA_ENABLED=true
+AUDIT_LOGGING_ENABLED=true
+```
 
-1. **API Integration**: Use provided API endpoints for programmatic access
-2. **Environment Variables**: Configure system settings via environment variables
-3. **Database Setup**: Ensure proper database connectivity before configuration
-4. **Backup Strategy**: Implement automated backup schedules using the API
-5. **Monitoring**: Set up alerts for performance threshold violations
+#### Step 3: Configure Certificate Authority
+1. **Navigate to "CA Settings" tab**
+2. **Enable auto-renewal** for production environments
+3. **Set renewal thresholds** (30 days recommended)
+4. **Configure CRL/OCSP** for certificate validation
+5. **Test CA connectivity** before going live
+
+#### Step 4: Performance Monitoring Setup
+1. **Enable health checks** with 5-minute intervals
+2. **Set performance thresholds**:
+   - CPU: 80% warning, 90% critical
+   - Memory: 85% warning, 95% critical
+   - Response Time: 3000ms warning, 5000ms critical
+3. **Configure alerts** for threshold violations
+
+### 🔧 Configuration Examples
+
+#### Production Environment Setup
+```bash
+# Security Configuration
+PASSWORD_MIN_LENGTH=12
+PASSWORD_REQUIRE_UPPERCASE=true
+PASSWORD_REQUIRE_LOWERCASE=true
+PASSWORD_REQUIRE_NUMBERS=true
+PASSWORD_REQUIRE_SPECIAL_CHARS=true
+PASSWORD_PREVENT_REUSE=5
+SESSION_TIMEOUT_MINUTES=30
+MFA_ENABLED=true
+
+# CA Configuration
+CA_AUTO_RENEWAL_ENABLED=true
+CA_RENEWAL_THRESHOLD_DAYS=30
+CA_DEFAULT_VALIDITY_DAYS=365
+CRL_ENABLED=true
+CRL_UPDATE_INTERVAL_HOURS=24
+OCSP_ENABLED=true
+
+# Performance Configuration
+HEALTH_CHECKS_ENABLED=true
+METRICS_ENABLED=true
+MAX_CPU_USAGE_PERCENT=80
+MAX_MEMORY_USAGE_PERCENT=85
+RATE_LIMIT_REQUESTS_PER_MINUTE=1000
+```
+
+#### Development Environment Setup
+```bash
+# Relaxed security for development
+PASSWORD_MIN_LENGTH=8
+SESSION_TIMEOUT_MINUTES=60
+MFA_ENABLED=false
+
+# CA Configuration
+CA_AUTO_RENEWAL_ENABLED=false
+CRL_ENABLED=false
+OCSP_ENABLED=false
+
+# Performance Configuration
+HEALTH_CHECKS_ENABLED=true
+METRICS_ENABLED=false
+```
+
+### 💡 Best Practices
+
+#### 🔒 Security Best Practices
+
+1. **Password Policies**
+   - **Minimum Length**: 12+ characters for production
+   - **Complexity**: Require all character types
+   - **Expiry**: 90 days maximum for sensitive systems
+   - **Reuse Prevention**: Block last 5 passwords
+
+2. **Session Management**
+   - **Timeout**: 30 minutes for active sessions
+   - **Concurrent Limits**: 3-5 sessions per user
+   - **MFA**: Always enable for administrators
+   - **Audit Logging**: Enable all security events
+
+3. **Access Control**
+   - **Principle of Least Privilege**: Grant minimal required permissions
+   - **Regular Audits**: Review user permissions quarterly
+   - **Role-Based Access**: Use predefined roles consistently
+
+#### 🏗️ System Configuration Best Practices
+
+1. **Database Management**
+   - **Regular Backups**: Daily automated backups
+   - **Backup Verification**: Test restore procedures monthly
+   - **Storage Planning**: Monitor disk usage trends
+   - **Connection Pooling**: Configure appropriate pool sizes
+
+2. **Performance Optimization**
+   - **Resource Limits**: Set conservative thresholds
+   - **Monitoring**: Enable comprehensive health checks
+   - **Alert Configuration**: Set up multiple notification channels
+   - **Capacity Planning**: Monitor usage patterns
+
+3. **Maintenance Procedures**
+   - **Scheduled Maintenance**: Plan maintenance windows
+   - **Communication**: Notify users of scheduled downtime
+   - **Rollback Plans**: Always have rollback procedures ready
+   - **Testing**: Test maintenance procedures in staging
+
+#### 📜 Certificate Authority Best Practices
+
+1. **CA Management**
+   - **Auto-Renewal**: Enable for production environments
+   - **Renewal Thresholds**: 30 days before expiry
+   - **Backup CAs**: Maintain offline backup CAs
+   - **Key Security**: Use hardware security modules (HSM)
+
+2. **Certificate Lifecycle**
+   - **Validity Periods**: 1 year for server certificates
+   - **Renewal Process**: Automate where possible
+   - **Revocation**: Immediate revocation for compromised keys
+   - **CRL/OCSP**: Enable both for comprehensive validation
+
+3. **Security Standards**
+   - **Key Sizes**: Minimum 2048-bit RSA, prefer 3072-bit
+   - **Algorithms**: Use ECDSA for new deployments
+   - **Extensions**: Limit custom extensions to required only
+   - **Validation**: Regular certificate inventory audits
+
+### 🚨 Common Configuration Scenarios
+
+#### Scenario 1: New Production Deployment
+```bash
+# Step 1: Security First
+PASSWORD_MIN_LENGTH=12
+MFA_ENABLED=true
+SESSION_TIMEOUT_MINUTES=30
+
+# Step 2: CA Setup
+CA_AUTO_RENEWAL_ENABLED=true
+CRL_ENABLED=true
+OCSP_ENABLED=true
+
+# Step 3: Monitoring
+HEALTH_CHECKS_ENABLED=true
+METRICS_ENABLED=true
+ALERT_EMAIL_ENABLED=true
+```
+
+#### Scenario 2: High-Security Environment
+```bash
+# Enhanced Security
+PASSWORD_MIN_LENGTH=16
+PASSWORD_PREVENT_REUSE=10
+SESSION_TIMEOUT_MINUTES=15
+MFA_REQUIRED=true
+
+# Strict CA Policies
+CA_DEFAULT_VALIDITY_DAYS=180
+CA_MAX_RENEWAL_ATTEMPTS=1
+CRL_UPDATE_INTERVAL_HOURS=6
+
+# Intensive Monitoring
+HEALTH_CHECKS_INTERVAL_MINUTES=2
+METRICS_RETENTION_DAYS=365
+```
+
+#### Scenario 3: Development Environment
+```bash
+# Relaxed for Development
+PASSWORD_MIN_LENGTH=8
+SESSION_TIMEOUT_MINUTES=120
+MFA_ENABLED=false
+
+# Simplified CA
+CA_AUTO_RENEWAL_ENABLED=false
+CRL_ENABLED=false
+OCSP_ENABLED=false
+
+# Basic Monitoring
+HEALTH_CHECKS_ENABLED=true
+METRICS_ENABLED=false
+```
+
+### 🔍 Troubleshooting Guide
+
+#### Authentication Issues
+- **Check Permissions**: Verify `config:manage` permission
+- **Session Timeout**: Extend session timeout if needed
+- **MFA Setup**: Ensure MFA is properly configured
+- **Role Assignment**: Confirm administrator role
+
+#### Database Problems
+- **Connection Issues**: Verify DATABASE_URL configuration
+- **Backup Failures**: Check file system permissions
+- **Migration Errors**: Review migration logs
+- **Performance Issues**: Monitor query execution times
+
+#### Certificate Authority Issues
+- **Renewal Failures**: Check CA connectivity and permissions
+- **CRL Generation**: Verify CRL distribution points
+- **OCSP Problems**: Check responder URL configuration
+- **Certificate Validation**: Test certificate chains
+
+#### Performance Problems
+- **High CPU Usage**: Review resource limits and thresholds
+- **Memory Issues**: Check memory allocation and leaks
+- **Slow Responses**: Monitor database query performance
+- **Alert Configuration**: Verify alert thresholds and channels
+
+### 📊 Monitoring & Maintenance
+
+#### Daily Checks
+- [ ] Review system health status
+- [ ] Check certificate expiry dates
+- [ ] Monitor resource usage trends
+- [ ] Verify backup completion
+
+#### Weekly Tasks
+- [ ] Review audit logs for suspicious activity
+- [ ] Test backup restoration procedures
+- [ ] Update security patches
+- [ ] Review user access permissions
+
+#### Monthly Tasks
+- [ ] Full security audit
+- [ ] Performance optimization review
+- [ ] Certificate inventory audit
+- [ ] Compliance documentation update
+
+#### Quarterly Tasks
+- [ ] Complete system backup test
+- [ ] Security policy review
+- [ ] User permission audit
+- [ ] Disaster recovery test
+
+### 📞 Support & Resources
+
+#### Getting Help
+1. **Documentation**: This comprehensive guide
+2. **API Reference**: Complete endpoint documentation
+3. **Logs**: Application and audit logs
+4. **Testing**: Run test suites for verification
+
+#### Emergency Contacts
+- **Security Issues**: Immediate response required
+- **System Down**: Critical system failure
+- **Data Loss**: Backup and recovery needed
+- **Performance Issues**: System slowdown or unavailability
+
+#### Useful Commands
+```bash
+# Check system status
+curl -H "Authorization: Bearer $TOKEN" http://localhost:3000/api/admin/health
+
+# Create backup
+curl -X POST -H "Authorization: Bearer $TOKEN" http://localhost:3000/api/admin/system-config \
+  -d '{"action":"createBackup"}'
+
+# View audit logs
+curl -H "Authorization: Bearer $TOKEN" "http://localhost:3000/api/admin/audit?limit=50"
+```
 
 ## Configuration Examples
 

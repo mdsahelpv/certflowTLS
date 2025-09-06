@@ -1,6 +1,8 @@
-# API Reference
+# 🔌 Complete API Reference Guide
 
-This document describes how to use the application entirely over HTTP APIs. All features available in the Web UI are also exposed via the API.
+**Comprehensive API documentation for all system endpoints**
+
+📖 **Quick Reference**: See [README.md](../README.md) for system overview and authentication setup
 
 ## Base URL
 
@@ -213,6 +215,569 @@ accept: application/ocsp-response
 ```
 
 Body: DER-encoded OCSP request bytes.
+
+## Admin Settings APIs
+
+### Authentication & Permissions
+
+All admin endpoints require:
+- **Authentication**: Valid session or Bearer token
+- **Permission**: `config:manage` permission required
+- **Role**: Administrator role required
+
+### Security Settings API
+
+#### Get Security Configuration
+**GET** `/api/admin/security`
+
+**Response:**
+```json
+{
+  "passwordPolicy": {
+    "minLength": 8,
+    "requireUppercase": true,
+    "requireLowercase": true,
+    "requireNumbers": true,
+    "requireSpecialChars": true,
+    "preventReuse": 5,
+    "expiryDays": 90
+  },
+  "sessionConfig": {
+    "timeoutMinutes": 30,
+    "maxConcurrentSessions": 5,
+    "extendOnActivity": true,
+    "rememberMeDays": 30
+  },
+  "auditConfig": {
+    "enabled": true,
+    "logLevel": "info",
+    "retentionDays": 365,
+    "alertOnSuspicious": true
+  }
+}
+```
+
+#### Update Password Policy
+**POST** `/api/admin/security`
+
+**Request:**
+```json
+{
+  "action": "updatePasswordPolicy",
+  "config": {
+    "passwordPolicy": {
+      "minLength": 12,
+      "requireUppercase": true,
+      "requireLowercase": true,
+      "requireNumbers": true,
+      "requireSpecialChars": true,
+      "preventReuse": 5,
+      "expiryDays": 90
+    }
+  }
+}
+```
+
+#### Update Session Configuration
+**POST** `/api/admin/security`
+
+**Request:**
+```json
+{
+  "action": "updateSessionConfig",
+  "config": {
+    "sessionConfig": {
+      "timeoutMinutes": 60,
+      "maxConcurrentSessions": 3,
+      "extendOnActivity": true,
+      "rememberMeDays": 7
+    }
+  }
+}
+```
+
+#### Update Audit Configuration
+**POST** `/api/admin/security`
+
+**Request:**
+```json
+{
+  "action": "updateAuditConfig",
+  "config": {
+    "auditConfig": {
+      "enabled": true,
+      "logLevel": "debug",
+      "retentionDays": 180,
+      "alertOnSuspicious": true
+    }
+  }
+}
+```
+
+### Certificate Authority Settings API
+
+#### Get CA Configuration
+**GET** `/api/admin/ca`
+
+**Response:**
+```json
+{
+  "renewalPolicy": {
+    "autoRenewalEnabled": false,
+    "renewalThresholdDays": 30,
+    "maxRenewalAttempts": 3,
+    "renewalNotificationDays": 7
+  },
+  "certificateTemplates": {
+    "defaultValidityDays": 365,
+    "defaultKeySize": 2048,
+    "defaultAlgorithm": "RSA",
+    "allowCustomExtensions": true
+  },
+  "crlSettings": {
+    "enabled": true,
+    "updateIntervalHours": 24,
+    "includeRevokedCerts": true,
+    "crlDistributionPoints": ["https://yourdomain.com/crl/latest.crl"]
+  },
+  "ocspSettings": {
+    "enabled": true,
+    "responderUrl": "https://yourdomain.com/ocsp",
+    "cacheTimeoutMinutes": 60,
+    "includeNextUpdate": true
+  }
+}
+```
+
+#### Update CA Renewal Policy
+**POST** `/api/admin/ca`
+
+**Request:**
+```json
+{
+  "action": "updateRenewalPolicy",
+  "config": {
+    "renewalPolicy": {
+      "autoRenewalEnabled": true,
+      "renewalThresholdDays": 45,
+      "maxRenewalAttempts": 5,
+      "renewalNotificationDays": 14
+    }
+  }
+}
+```
+
+#### Update Certificate Templates
+**POST** `/api/admin/ca`
+
+**Request:**
+```json
+{
+  "action": "updateCertificateTemplates",
+  "config": {
+    "certificateTemplates": {
+      "defaultValidityDays": 730,
+      "defaultKeySize": 4096,
+      "defaultAlgorithm": "ECDSA",
+      "allowCustomExtensions": false
+    }
+  }
+}
+```
+
+#### Update CRL Settings
+**POST** `/api/admin/ca`
+
+**Request:**
+```json
+{
+  "action": "updateCrlSettings",
+  "config": {
+    "crlSettings": {
+      "enabled": true,
+      "updateIntervalHours": 12,
+      "includeRevokedCerts": true,
+      "crlDistributionPoints": [
+        "https://primary.crl.example.com/latest.crl",
+        "https://backup.crl.example.com/latest.crl"
+      ]
+    }
+  }
+}
+```
+
+#### Update OCSP Settings
+**POST** `/api/admin/ca`
+
+**Request:**
+```json
+{
+  "action": "updateOcspSettings",
+  "config": {
+    "ocspSettings": {
+      "enabled": true,
+      "responderUrl": "https://ocsp.example.com",
+      "cacheTimeoutMinutes": 30,
+      "includeNextUpdate": true
+    }
+  }
+}
+```
+
+### Performance & Monitoring API
+
+#### Get Performance Configuration
+**GET** `/api/admin/performance`
+
+**Response:**
+```json
+{
+  "healthChecks": {
+    "enabled": true,
+    "checkIntervalMinutes": 5,
+    "timeoutSeconds": 30,
+    "failureThreshold": 3
+  },
+  "performanceMetrics": {
+    "enabled": true,
+    "collectionIntervalMinutes": 1,
+    "dataRetentionDays": 30,
+    "cpuThreshold": 80,
+    "memoryThreshold": 85,
+    "diskThreshold": 90,
+    "responseTimeThreshold": 5000
+  },
+  "resourceLimits": {
+    "maxCpuUsage": 90,
+    "maxMemoryUsage": 90,
+    "maxDiskUsage": 95,
+    "maxConcurrentConnections": 1000,
+    "rateLimitRequestsPerMinute": 1000
+  }
+}
+```
+
+#### Update Health Checks
+**POST** `/api/admin/performance`
+
+**Request:**
+```json
+{
+  "action": "updateHealthChecks",
+  "config": {
+    "healthChecks": {
+      "enabled": true,
+      "checkIntervalMinutes": 10,
+      "timeoutSeconds": 60,
+      "failureThreshold": 5
+    }
+  }
+}
+```
+
+#### Update Performance Metrics
+**POST** `/api/admin/performance`
+
+**Request:**
+```json
+{
+  "action": "updateMetrics",
+  "config": {
+    "performanceMetrics": {
+      "enabled": true,
+      "collectionIntervalMinutes": 5,
+      "dataRetentionDays": 90,
+      "cpuThreshold": 75,
+      "memoryThreshold": 80,
+      "diskThreshold": 85,
+      "responseTimeThreshold": 3000
+    }
+  }
+}
+```
+
+#### Update Resource Limits
+**POST** `/api/admin/performance`
+
+**Request:**
+```json
+{
+  "action": "updateResourceLimits",
+  "config": {
+    "resourceLimits": {
+      "maxCpuUsage": 85,
+      "maxMemoryUsage": 85,
+      "maxDiskUsage": 90,
+      "maxConcurrentConnections": 500,
+      "rateLimitRequestsPerMinute": 500
+    }
+  }
+}
+```
+
+### System Configuration API
+
+#### Get System Configuration
+**GET** `/api/admin/system-config`
+
+**Response:**
+```json
+{
+  "databaseType": "SQLite",
+  "databaseUrl": "configured",
+  "maintenanceMode": false,
+  "maintenanceMessage": "System is currently under maintenance. Please try again later.",
+  "environmentVariables": {
+    "NODE_ENV": "production",
+    "DATABASE_URL": "file:./db/custom.db",
+    "NEXTAUTH_SECRET": "configured"
+  }
+}
+```
+
+#### Toggle Maintenance Mode
+**POST** `/api/admin/system-config`
+
+**Request:**
+```json
+{
+  "action": "toggleMaintenance",
+  "config": {
+    "maintenanceMode": true,
+    "maintenanceMessage": "Scheduled maintenance in progress. Please try again in 30 minutes."
+  }
+}
+```
+
+#### Create Database Backup
+**POST** `/api/admin/system-config`
+
+**Request:**
+```json
+{
+  "action": "createBackup",
+  "config": {}
+}
+```
+
+#### List Database Backups
+**POST** `/api/admin/system-config`
+
+**Request:**
+```json
+{
+  "action": "listBackups",
+  "config": {}
+}
+```
+
+#### Delete Database Backup
+**POST** `/api/admin/system-config`
+
+**Request:**
+```json
+{
+  "action": "deleteBackup",
+  "config": {
+    "filename": "backup_2025-01-15_14-30-00.db"
+  }
+}
+```
+
+### Notifications & Integrations API
+
+#### Get Notifications Configuration
+**GET** `/api/admin/notifications`
+
+**Response:**
+```json
+{
+  "smtpConfig": {
+    "host": "smtp.example.com",
+    "port": 587,
+    "secure": false,
+    "auth": {
+      "user": "noreply@example.com",
+      "pass": "configured"
+    }
+  },
+  "alertThresholds": {
+    "certificateExpiryDays": 30,
+    "crlUpdateHours": 25,
+    "diskUsagePercent": 85,
+    "memoryUsagePercent": 90
+  },
+  "webhookSettings": {
+    "enabled": true,
+    "url": "https://api.example.com/webhooks/ca-events",
+    "secret": "configured",
+    "events": ["certificate_issued", "certificate_revoked", "crl_updated"]
+  }
+}
+```
+
+#### Update SMTP Configuration
+**POST** `/api/admin/notifications`
+
+**Request:**
+```json
+{
+  "action": "updateSmtpConfig",
+  "config": {
+    "smtpConfig": {
+      "host": "smtp.gmail.com",
+      "port": 587,
+      "secure": false,
+      "auth": {
+        "user": "noreply@example.com",
+        "pass": "your-app-password"
+      }
+    }
+  }
+}
+```
+
+#### Update Alert Thresholds
+**POST** `/api/admin/notifications`
+
+**Request:**
+```json
+{
+  "action": "updateAlertThresholds",
+  "config": {
+    "alertThresholds": {
+      "certificateExpiryDays": 45,
+      "crlUpdateHours": 26,
+      "diskUsagePercent": 80,
+      "memoryUsagePercent": 85
+    }
+  }
+}
+```
+
+#### Update Webhook Settings
+**POST** `/api/admin/notifications`
+
+**Request:**
+```json
+{
+  "action": "updateWebhookSettings",
+  "config": {
+    "webhookSettings": {
+      "enabled": true,
+      "url": "https://api.example.com/webhooks/ca-events",
+      "secret": "your-webhook-secret",
+      "events": ["certificate_issued", "certificate_revoked", "crl_updated", "ca_renewed"]
+    }
+  }
+}
+```
+
+### Health Monitoring API
+
+#### Get Health Status
+**GET** `/api/admin/health`
+
+**Response:**
+```json
+{
+  "status": "healthy",
+  "timestamp": "2025-01-15T14:30:00.000Z",
+  "checks": {
+    "database": {
+      "status": "healthy",
+      "responseTime": 45,
+      "lastChecked": "2025-01-15T14:30:00.000Z"
+    },
+    "certificateAuthority": {
+      "status": "healthy",
+      "activeCAs": 2,
+      "lastChecked": "2025-01-15T14:30:00.000Z"
+    },
+    "ocspResponder": {
+      "status": "healthy",
+      "uptime": "99.9%",
+      "lastChecked": "2025-01-15T14:30:00.000Z"
+    },
+    "systemResources": {
+      "status": "healthy",
+      "cpuUsage": 45,
+      "memoryUsage": 60,
+      "diskUsage": 30,
+      "lastChecked": "2025-01-15T14:30:00.000Z"
+    }
+  }
+}
+```
+
+### Audit & Sessions API
+
+#### Get Audit Logs
+**GET** `/api/admin/audit?limit=50&page=1&action=LOGIN&userId=123`
+
+**Response:**
+```json
+{
+  "logs": [
+    {
+      "id": "audit_123",
+      "timestamp": "2025-01-15T14:30:00.000Z",
+      "action": "LOGIN",
+      "userId": "user_456",
+      "username": "admin",
+      "ipAddress": "192.168.1.100",
+      "userAgent": "Mozilla/5.0...",
+      "details": {
+        "successful": true,
+        "method": "password"
+      }
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "limit": 50,
+    "total": 1250,
+    "pages": 25
+  }
+}
+```
+
+#### Get Active Sessions
+**GET** `/api/admin/sessions`
+
+**Response:**
+```json
+{
+  "sessions": [
+    {
+      "id": "session_123",
+      "userId": "user_456",
+      "username": "admin",
+      "ipAddress": "192.168.1.100",
+      "userAgent": "Mozilla/5.0...",
+      "createdAt": "2025-01-15T10:30:00.000Z",
+      "lastActivity": "2025-01-15T14:30:00.000Z",
+      "expiresAt": "2025-01-15T16:30:00.000Z"
+    }
+  ],
+  "summary": {
+    "totalActive": 5,
+    "adminSessions": 2,
+    "operatorSessions": 3
+  }
+}
+```
+
+#### Force Session Logout
+**POST** `/api/admin/sessions`
+
+**Request:**
+```json
+{
+  "action": "forceLogout",
+  "sessionId": "session_123"
+}
+```
 
 ## Users, Profile, Notifications, Audit
 

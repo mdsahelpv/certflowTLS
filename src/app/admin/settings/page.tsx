@@ -20,7 +20,7 @@ export default function AdminSettingsPage() {
   const [systemConfig, setSystemConfig] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [maintenanceMode, setMaintenanceMode] = useState(false);
-  const [maintenanceMessage, setMaintenanceMessage] = useState('');
+  const [maintenanceMessage, setMaintenanceMessage] = useState('System is currently under maintenance. Please try again later.');
   const [backupHistory, setBackupHistory] = useState<any[]>([]);
   const [securityConfig, setSecurityConfig] = useState<any>(null);
   const [passwordPolicy, setPasswordPolicy] = useState({
@@ -49,6 +49,52 @@ export default function AdminSettingsPage() {
     logLevel: 'info',
     retentionDays: 365,
     alertOnSuspicious: true,
+  });
+  const [caRenewalPolicy, setCaRenewalPolicy] = useState({
+    autoRenewalEnabled: false,
+    renewalThresholdDays: 30,
+    maxRenewalAttempts: 3,
+    renewalNotificationDays: 7,
+  });
+  const [certificateTemplates, setCertificateTemplates] = useState({
+    defaultValidityDays: 365,
+    defaultKeySize: 2048,
+    defaultAlgorithm: 'RSA',
+    allowCustomExtensions: true,
+  });
+  const [crlSettings, setCrlSettings] = useState({
+    enabled: true,
+    updateIntervalHours: 24,
+    includeRevokedCerts: true,
+    crlDistributionPoints: 'https://yourdomain.com/crl/latest.crl',
+  });
+  const [ocspSettings, setOcspSettings] = useState({
+    enabled: true,
+    responderUrl: 'https://yourdomain.com/ocsp',
+    cacheTimeoutMinutes: 60,
+    includeNextUpdate: true,
+  });
+  const [healthChecks, setHealthChecks] = useState({
+    enabled: true,
+    checkIntervalMinutes: 5,
+    timeoutSeconds: 30,
+    failureThreshold: 3,
+  });
+  const [performanceMetrics, setPerformanceMetrics] = useState({
+    enabled: true,
+    collectionIntervalMinutes: 1,
+    dataRetentionDays: 30,
+    cpuThreshold: 80,
+    memoryThreshold: 85,
+    diskThreshold: 90,
+    responseTimeThreshold: 5000,
+  });
+  const [resourceLimits, setResourceLimits] = useState({
+    maxCpuUsage: 90,
+    maxMemoryUsage: 90,
+    maxDiskUsage: 95,
+    maxConcurrentConnections: 1000,
+    rateLimitRequestsPerMinute: 1000,
   });
 
   if (!isAuthenticated || !session) {
@@ -884,20 +930,45 @@ export default function AdminSettingsPage() {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="auto-renewal">Enable Auto Renewal</Label>
-                  <Switch id="auto-renewal" />
+                  <Switch
+                    id="auto-renewal"
+                    checked={caRenewalPolicy.autoRenewalEnabled}
+                    onCheckedChange={(checked) => setCaRenewalPolicy(prev => ({ ...prev, autoRenewalEnabled: checked }))}
+                  />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="renewal-threshold">Renewal Threshold (days before expiry)</Label>
-                    <Input id="renewal-threshold" type="number" min="1" max="365" defaultValue="30" />
+                    <Input
+                      id="renewal-threshold"
+                      type="number"
+                      min="1"
+                      max="365"
+                      value={caRenewalPolicy.renewalThresholdDays}
+                      onChange={(e) => setCaRenewalPolicy(prev => ({ ...prev, renewalThresholdDays: parseInt(e.target.value) }))}
+                    />
                   </div>
                   <div>
                     <Label htmlFor="max-attempts">Max Renewal Attempts</Label>
-                    <Input id="max-attempts" type="number" min="1" max="10" defaultValue="3" />
+                    <Input
+                      id="max-attempts"
+                      type="number"
+                      min="1"
+                      max="10"
+                      value={caRenewalPolicy.maxRenewalAttempts}
+                      onChange={(e) => setCaRenewalPolicy(prev => ({ ...prev, maxRenewalAttempts: parseInt(e.target.value) }))}
+                    />
                   </div>
                   <div>
                     <Label htmlFor="notification-days">Notification Days Before Expiry</Label>
-                    <Input id="notification-days" type="number" min="1" max="90" defaultValue="7" />
+                    <Input
+                      id="notification-days"
+                      type="number"
+                      min="1"
+                      max="90"
+                      value={caRenewalPolicy.renewalNotificationDays}
+                      onChange={(e) => setCaRenewalPolicy(prev => ({ ...prev, renewalNotificationDays: parseInt(e.target.value) }))}
+                    />
                   </div>
                 </div>
                 <Button className="mt-4">Save Renewal Policy</Button>
@@ -921,11 +992,21 @@ export default function AdminSettingsPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="default-validity">Default Validity (days)</Label>
-                    <Input id="default-validity" type="number" min="30" max="3650" defaultValue="365" />
+                    <Input
+                      id="default-validity"
+                      type="number"
+                      min="30"
+                      max="3650"
+                      value={certificateTemplates.defaultValidityDays}
+                      onChange={(e) => setCertificateTemplates(prev => ({ ...prev, defaultValidityDays: parseInt(e.target.value) }))}
+                    />
                   </div>
                   <div>
                     <Label htmlFor="default-key-size">Default Key Size</Label>
-                    <Select defaultValue="2048">
+                    <Select
+                      value={certificateTemplates.defaultKeySize.toString()}
+                      onValueChange={(value) => setCertificateTemplates(prev => ({ ...prev, defaultKeySize: parseInt(value) }))}
+                    >
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
@@ -939,7 +1020,10 @@ export default function AdminSettingsPage() {
                   </div>
                   <div>
                     <Label htmlFor="default-algorithm">Default Algorithm</Label>
-                    <Select defaultValue="RSA">
+                    <Select
+                      value={certificateTemplates.defaultAlgorithm}
+                      onValueChange={(value) => setCertificateTemplates(prev => ({ ...prev, defaultAlgorithm: value }))}
+                    >
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
@@ -952,7 +1036,11 @@ export default function AdminSettingsPage() {
                 </div>
                 <div className="flex items-center justify-between">
                   <Label htmlFor="custom-extensions">Allow Custom Extensions</Label>
-                  <Switch id="custom-extensions" defaultChecked />
+                  <Switch
+                    id="custom-extensions"
+                    checked={certificateTemplates.allowCustomExtensions}
+                    onCheckedChange={(checked) => setCertificateTemplates(prev => ({ ...prev, allowCustomExtensions: checked }))}
+                  />
                 </div>
                 <Button className="mt-4">Save Certificate Templates</Button>
               </div>
@@ -974,17 +1062,32 @@ export default function AdminSettingsPage() {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="crl-enabled">Enable CRL</Label>
-                  <Switch id="crl-enabled" defaultChecked />
+                  <Switch
+                    id="crl-enabled"
+                    checked={crlSettings.enabled}
+                    onCheckedChange={(checked) => setCrlSettings(prev => ({ ...prev, enabled: checked }))}
+                  />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="crl-interval">Update Interval (hours)</Label>
-                    <Input id="crl-interval" type="number" min="1" max="168" defaultValue="24" />
+                    <Input
+                      id="crl-interval"
+                      type="number"
+                      min="1"
+                      max="168"
+                      value={crlSettings.updateIntervalHours}
+                      onChange={(e) => setCrlSettings(prev => ({ ...prev, updateIntervalHours: parseInt(e.target.value) }))}
+                    />
                   </div>
                 </div>
                 <div className="flex items-center justify-between">
                   <Label htmlFor="include-revoked">Include Revoked Certificates</Label>
-                  <Switch id="include-revoked" defaultChecked />
+                  <Switch
+                    id="include-revoked"
+                    checked={crlSettings.includeRevokedCerts}
+                    onCheckedChange={(checked) => setCrlSettings(prev => ({ ...prev, includeRevokedCerts: checked }))}
+                  />
                 </div>
                 <div>
                   <Label htmlFor="distribution-points">CRL Distribution Points</Label>
@@ -992,7 +1095,8 @@ export default function AdminSettingsPage() {
                     id="distribution-points"
                     placeholder="Enter CRL distribution URLs (one per line)"
                     rows={3}
-                    defaultValue="https://yourdomain.com/crl/latest.crl"
+                    value={crlSettings.crlDistributionPoints}
+                    onChange={(e) => setCrlSettings(prev => ({ ...prev, crlDistributionPoints: e.target.value }))}
                   />
                 </div>
                 <Button className="mt-4">Save CRL Settings</Button>
@@ -1015,7 +1119,11 @@ export default function AdminSettingsPage() {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="ocsp-enabled">Enable OCSP</Label>
-                  <Switch id="ocsp-enabled" defaultChecked />
+                  <Switch
+                    id="ocsp-enabled"
+                    checked={ocspSettings.enabled}
+                    onCheckedChange={(checked) => setOcspSettings(prev => ({ ...prev, enabled: checked }))}
+                  />
                 </div>
                 <div>
                   <Label htmlFor="responder-url">OCSP Responder URL</Label>
@@ -1023,18 +1131,30 @@ export default function AdminSettingsPage() {
                     id="responder-url"
                     type="url"
                     placeholder="https://yourdomain.com/ocsp"
-                    defaultValue="https://yourdomain.com/ocsp"
+                    value={ocspSettings.responderUrl}
+                    onChange={(e) => setOcspSettings(prev => ({ ...prev, responderUrl: e.target.value }))}
                   />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="cache-timeout">Cache Timeout (minutes)</Label>
-                    <Input id="cache-timeout" type="number" min="5" max="1440" defaultValue="60" />
+                    <Input
+                      id="cache-timeout"
+                      type="number"
+                      min="5"
+                      max="1440"
+                      value={ocspSettings.cacheTimeoutMinutes}
+                      onChange={(e) => setOcspSettings(prev => ({ ...prev, cacheTimeoutMinutes: parseInt(e.target.value) }))}
+                    />
                   </div>
                 </div>
                 <div className="flex items-center justify-between">
                   <Label htmlFor="include-next-update">Include Next Update</Label>
-                  <Switch id="include-next-update" defaultChecked />
+                  <Switch
+                    id="include-next-update"
+                    checked={ocspSettings.includeNextUpdate}
+                    onCheckedChange={(checked) => setOcspSettings(prev => ({ ...prev, includeNextUpdate: checked }))}
+                  />
                 </div>
                 <Button className="mt-4">Save OCSP Settings</Button>
               </div>
@@ -1059,20 +1179,45 @@ export default function AdminSettingsPage() {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="health-enabled">Enable Health Checks</Label>
-                  <Switch id="health-enabled" defaultChecked />
+                  <Switch
+                    id="health-enabled"
+                    checked={healthChecks.enabled}
+                    onCheckedChange={(checked) => setHealthChecks(prev => ({ ...prev, enabled: checked }))}
+                  />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
                     <Label htmlFor="health-interval">Check Interval (minutes)</Label>
-                    <Input id="health-interval" type="number" min="1" max="60" defaultValue="5" />
+                    <Input
+                      id="health-interval"
+                      type="number"
+                      min="1"
+                      max="60"
+                      value={healthChecks.checkIntervalMinutes}
+                      onChange={(e) => setHealthChecks(prev => ({ ...prev, checkIntervalMinutes: parseInt(e.target.value) }))}
+                    />
                   </div>
                   <div>
                     <Label htmlFor="health-timeout">Timeout (seconds)</Label>
-                    <Input id="health-timeout" type="number" min="5" max="300" defaultValue="30" />
+                    <Input
+                      id="health-timeout"
+                      type="number"
+                      min="5"
+                      max="300"
+                      value={healthChecks.timeoutSeconds}
+                      onChange={(e) => setHealthChecks(prev => ({ ...prev, timeoutSeconds: parseInt(e.target.value) }))}
+                    />
                   </div>
                   <div>
                     <Label htmlFor="failure-threshold">Failure Threshold</Label>
-                    <Input id="failure-threshold" type="number" min="1" max="10" defaultValue="3" />
+                    <Input
+                      id="failure-threshold"
+                      type="number"
+                      min="1"
+                      max="10"
+                      value={healthChecks.failureThreshold}
+                      onChange={(e) => setHealthChecks(prev => ({ ...prev, failureThreshold: parseInt(e.target.value) }))}
+                    />
                   </div>
                 </div>
                 <Button className="mt-4">Save Health Check Settings</Button>
@@ -1095,16 +1240,34 @@ export default function AdminSettingsPage() {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="metrics-enabled">Enable Metrics Collection</Label>
-                  <Switch id="metrics-enabled" defaultChecked />
+                  <Switch
+                    id="metrics-enabled"
+                    checked={performanceMetrics.enabled}
+                    onCheckedChange={(checked) => setPerformanceMetrics(prev => ({ ...prev, enabled: checked }))}
+                  />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="metrics-interval">Collection Interval (minutes)</Label>
-                    <Input id="metrics-interval" type="number" min="1" max="60" defaultValue="1" />
+                    <Input
+                      id="metrics-interval"
+                      type="number"
+                      min="1"
+                      max="60"
+                      value={performanceMetrics.collectionIntervalMinutes}
+                      onChange={(e) => setPerformanceMetrics(prev => ({ ...prev, collectionIntervalMinutes: parseInt(e.target.value) }))}
+                    />
                   </div>
                   <div>
                     <Label htmlFor="metrics-retention">Data Retention (days)</Label>
-                    <Input id="metrics-retention" type="number" min="1" max="365" defaultValue="30" />
+                    <Input
+                      id="metrics-retention"
+                      type="number"
+                      min="1"
+                      max="365"
+                      value={performanceMetrics.dataRetentionDays}
+                      onChange={(e) => setPerformanceMetrics(prev => ({ ...prev, dataRetentionDays: parseInt(e.target.value) }))}
+                    />
                   </div>
                 </div>
                 <div className="space-y-3">
@@ -1112,19 +1275,47 @@ export default function AdminSettingsPage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="cpu-threshold">CPU Usage (%)</Label>
-                      <Input id="cpu-threshold" type="number" min="1" max="100" defaultValue="80" />
+                      <Input
+                        id="cpu-threshold"
+                        type="number"
+                        min="1"
+                        max="100"
+                        value={performanceMetrics.cpuThreshold}
+                        onChange={(e) => setPerformanceMetrics(prev => ({ ...prev, cpuThreshold: parseInt(e.target.value) }))}
+                      />
                     </div>
                     <div>
                       <Label htmlFor="memory-threshold">Memory Usage (%)</Label>
-                      <Input id="memory-threshold" type="number" min="1" max="100" defaultValue="85" />
+                      <Input
+                        id="memory-threshold"
+                        type="number"
+                        min="1"
+                        max="100"
+                        value={performanceMetrics.memoryThreshold}
+                        onChange={(e) => setPerformanceMetrics(prev => ({ ...prev, memoryThreshold: parseInt(e.target.value) }))}
+                      />
                     </div>
                     <div>
                       <Label htmlFor="disk-threshold">Disk Usage (%)</Label>
-                      <Input id="disk-threshold" type="number" min="1" max="100" defaultValue="90" />
+                      <Input
+                        id="disk-threshold"
+                        type="number"
+                        min="1"
+                        max="100"
+                        value={performanceMetrics.diskThreshold}
+                        onChange={(e) => setPerformanceMetrics(prev => ({ ...prev, diskThreshold: parseInt(e.target.value) }))}
+                      />
                     </div>
                     <div>
                       <Label htmlFor="response-threshold">Response Time (ms)</Label>
-                      <Input id="response-threshold" type="number" min="100" max="30000" defaultValue="5000" />
+                      <Input
+                        id="response-threshold"
+                        type="number"
+                        min="100"
+                        max="30000"
+                        value={performanceMetrics.responseTimeThreshold}
+                        onChange={(e) => setPerformanceMetrics(prev => ({ ...prev, responseTimeThreshold: parseInt(e.target.value) }))}
+                      />
                     </div>
                   </div>
                 </div>
@@ -1149,24 +1340,59 @@ export default function AdminSettingsPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="max-cpu">Max CPU Usage (%)</Label>
-                    <Input id="max-cpu" type="number" min="1" max="100" defaultValue="90" />
+                    <Input
+                      id="max-cpu"
+                      type="number"
+                      min="1"
+                      max="100"
+                      value={resourceLimits.maxCpuUsage}
+                      onChange={(e) => setResourceLimits(prev => ({ ...prev, maxCpuUsage: parseInt(e.target.value) }))}
+                    />
                   </div>
                   <div>
                     <Label htmlFor="max-memory">Max Memory Usage (%)</Label>
-                    <Input id="max-memory" type="number" min="1" max="100" defaultValue="90" />
+                    <Input
+                      id="max-memory"
+                      type="number"
+                      min="1"
+                      max="100"
+                      value={resourceLimits.maxMemoryUsage}
+                      onChange={(e) => setResourceLimits(prev => ({ ...prev, maxMemoryUsage: parseInt(e.target.value) }))}
+                    />
                   </div>
                   <div>
                     <Label htmlFor="max-disk">Max Disk Usage (%)</Label>
-                    <Input id="max-disk" type="number" min="1" max="100" defaultValue="95" />
+                    <Input
+                      id="max-disk"
+                      type="number"
+                      min="1"
+                      max="100"
+                      value={resourceLimits.maxDiskUsage}
+                      onChange={(e) => setResourceLimits(prev => ({ ...prev, maxDiskUsage: parseInt(e.target.value) }))}
+                    />
                   </div>
                   <div>
                     <Label htmlFor="max-connections">Max Concurrent Connections</Label>
-                    <Input id="max-connections" type="number" min="10" max="10000" defaultValue="1000" />
+                    <Input
+                      id="max-connections"
+                      type="number"
+                      min="10"
+                      max="10000"
+                      value={resourceLimits.maxConcurrentConnections}
+                      onChange={(e) => setResourceLimits(prev => ({ ...prev, maxConcurrentConnections: parseInt(e.target.value) }))}
+                    />
                   </div>
                 </div>
                 <div>
                   <Label htmlFor="rate-limit">Rate Limit (requests per minute)</Label>
-                  <Input id="rate-limit" type="number" min="10" max="10000" defaultValue="1000" />
+                  <Input
+                    id="rate-limit"
+                    type="number"
+                    min="10"
+                    max="10000"
+                    value={resourceLimits.rateLimitRequestsPerMinute}
+                    onChange={(e) => setResourceLimits(prev => ({ ...prev, rateLimitRequestsPerMinute: parseInt(e.target.value) }))}
+                  />
                 </div>
                 <Button className="mt-4">Save Resource Limits</Button>
               </div>

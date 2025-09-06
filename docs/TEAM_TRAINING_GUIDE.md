@@ -1,11 +1,8 @@
-# 📚 Team Training & Onboarding Guide
-## Testing Infrastructure - Certificate Authority Management System
+# 🎓 Team Training & Onboarding Guide
 
----
+**Complete training materials for testing infrastructure and best practices**
 
-## 📋 **Overview**
-
-This guide provides comprehensive training materials for team members working with the testing infrastructure of the Certificate Authority Management System. It covers different roles, skill levels, and provides hands-on exercises to ensure everyone can effectively contribute to maintaining high-quality testing standards.
+📖 **Quick Reference**: See [README.md](../README.md) for system overview and [TESTING_STRATEGY.md](TESTING_STRATEGY.md) for testing details
 
 ## 🎯 **Training Objectives**
 

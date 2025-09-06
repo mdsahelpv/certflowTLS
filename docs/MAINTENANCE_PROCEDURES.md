@@ -1,11 +1,8 @@
-# 🔧 Testing Infrastructure Maintenance Procedures
-## Certificate Authority Management System
+# 🔧 System Maintenance & Testing Procedures
 
----
+**Complete maintenance guide for testing infrastructure and system updates**
 
-## 📋 **Overview**
-
-This document outlines the maintenance procedures for the testing infrastructure of the Certificate Authority Management System. Regular maintenance ensures the testing framework remains reliable, up-to-date, and effective in catching issues before they reach production.
+📖 **Quick Reference**: See [README.md](../README.md) for system overview and [TESTING_STRATEGY.md](TESTING_STRATEGY.md) for testing details
 
 ## 📅 **Maintenance Schedule**
 

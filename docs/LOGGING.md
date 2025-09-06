@@ -1,8 +1,8 @@
-# Logging System Documentation
+# 📊 Logging System Guide
 
-## Overview
+**Complete logging infrastructure for monitoring and debugging**
 
-The Certificate Authority Management System uses a comprehensive, structured logging system that provides:
+📖 **Quick Reference**: See [README.md](../README.md) for system overview and [MAINTENANCE_PROCEDURES.md](MAINTENANCE_PROCEDURES.md) for maintenance procedures
 
 - **Structured logging** with JSON and text formats
 - **Service-specific loggers** for different components

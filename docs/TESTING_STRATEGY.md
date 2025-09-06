@@ -1,11 +1,8 @@
-# 🧪 Comprehensive Testing Strategy
-## Certificate Authority Management System
+# 🧪 Testing Strategy & Execution Guide
 
----
+**Enterprise-grade testing infrastructure with 131+ automated tests**
 
-## 📋 **Executive Summary**
-
-This document outlines the comprehensive testing strategy for the Certificate Authority Management System, a Next.js-based application for managing X.509 certificates, Certificate Authorities, and related cryptographic operations. Our testing approach ensures high quality, security, accessibility, and performance across all aspects of the system.
+📖 **Quick Reference**: See [README.md](../README.md) for system overview and quick test commands
 
 ## 🎯 **Testing Objectives**
 
