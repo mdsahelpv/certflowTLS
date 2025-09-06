@@ -93,10 +93,14 @@ export function validateAuditConfig(config: any): { isValid: boolean; errors: st
 
 // CA Renewal Policy Validation
 export const caRenewalPolicySchema = z.object({
+  enabled: z.boolean(),
   autoRenewal: z.boolean(),
-  renewalThreshold: z.number().min(1).max(365),
-  maxAttempts: z.number().min(1).max(10),
-  notificationDays: z.number().min(1).max(90),
+  renewalThresholdDays: z.number().min(1).max(365),
+  maxRenewalAttempts: z.number().min(1).max(10),
+  notificationDaysBefore: z.number().min(1).max(90),
+  requireApproval: z.boolean(),
+  backupBeforeRenewal: z.boolean(),
+  testRenewalFirst: z.boolean(),
 });
 
 export type CARenewalPolicy = z.infer<typeof caRenewalPolicySchema>;
