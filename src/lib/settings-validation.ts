@@ -214,9 +214,32 @@ export function validateCertificateTemplateCollection(collection: any): { isVali
 // CRL Settings Validation
 export const crlSettingsSchema = z.object({
   enabled: z.boolean(),
+  autoGenerate: z.boolean(),
   updateIntervalHours: z.number().min(1).max(168),
+  includeExpired: z.boolean(),
   includeRevoked: z.boolean(),
-  distributionPoints: z.array(z.string().url()).min(1),
+  validityHours: z.number().min(24).max(8760), // 1 day to 1 year
+  overlapHours: z.number().min(1).max(24), // Next update overlap
+  distributionPoints: z.array(z.object({
+    url: z.string().url(),
+    enabled: z.boolean(),
+    priority: z.number().min(1).max(10),
+    lastSync: z.date().optional(),
+    syncStatus: z.enum(['success', 'failed', 'pending']).optional()
+  })).min(1),
+  notificationSettings: z.object({
+    enabled: z.boolean(),
+    notifyOnGeneration: z.boolean(),
+    notifyOnFailure: z.boolean(),
+    notifyOnDistributionFailure: z.boolean(),
+    recipients: z.array(z.string().email()).optional()
+  }),
+  securitySettings: z.object({
+    signCRL: z.boolean(),
+    crlSigningKey: z.string().optional(),
+    includeIssuer: z.boolean(),
+    includeExtensions: z.boolean()
+  })
 });
 
 export type CRLSettings = z.infer<typeof crlSettingsSchema>;
@@ -233,6 +256,33 @@ export function validateCRLSettings(settings: any): { isValid: boolean; errors: 
       };
     }
     return { isValid: false, errors: ['Invalid CRL settings format'] };
+  }
+}
+
+// CRL Generation Request Validation
+export const crlGenerationRequestSchema = z.object({
+  caId: z.string().min(1),
+  reason: z.enum(['scheduled', 'manual', 'revocation', 'emergency']),
+  priority: z.enum(['low', 'medium', 'high', 'critical']),
+  includeExpired: z.boolean().optional(),
+  customValidityHours: z.number().min(1).max(8760).optional(),
+  forceRegeneration: z.boolean().optional()
+});
+
+export type CRLGenerationRequest = z.infer<typeof crlGenerationRequestSchema>;
+
+export function validateCRLGenerationRequest(request: any): { isValid: boolean; errors: string[] } {
+  try {
+    crlGenerationRequestSchema.parse(request);
+    return { isValid: true, errors: [] };
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return {
+        isValid: false,
+        errors: error.issues.map(err => `${err.path.join('.')}: ${err.message}`)
+      };
+    }
+    return { isValid: false, errors: ['Invalid CRL generation request format'] };
   }
 }
 
@@ -488,6 +538,7 @@ export const SettingsValidation = {
   validateCertificateTemplate,
   validateCertificateTemplateCollection,
   validateCRLSettings,
+  validateCRLGenerationRequest,
   validateOCSPSettings,
   validateHealthCheckConfig,
   validatePerformanceMetricsConfig,

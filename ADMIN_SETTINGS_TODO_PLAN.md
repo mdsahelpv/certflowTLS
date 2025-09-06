@@ -53,11 +53,11 @@ This document outlines the complete implementation plan to make the admin settin
 - [x] **Add renewal attempt tracking**
 
 ### 3.2 Certificate Templates API
-- [ ] **Implement certificate template storage**
-- [ ] **Add validity period configuration**
-- [ ] **Create key size/algorithm settings**
-- [ ] **Implement extension controls**
-- [ ] **Add template validation**
+- [x] **Implement certificate template storage**
+- [x] **Add validity period configuration**
+- [x] **Create key size/algorithm settings**
+- [x] **Implement extension controls**
+- [x] **Add template validation**
 
 ### 3.3 CRL Settings API
 - [ ] **Create CRL configuration storage**
