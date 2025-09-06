@@ -340,6 +340,41 @@ export const ocspRequestSchema = z.object({
 
 export type OCSPRequest = z.infer<typeof ocspRequestSchema>;
 
+// Health Check Configuration Validation
+export const healthCheckConfigSchema = z.object({
+  enabled: z.boolean(),
+  intervalMinutes: z.number().min(1).max(60),
+  timeoutSeconds: z.number().min(5).max(300),
+  failureThreshold: z.number().min(1).max(10),
+  successThreshold: z.number().min(1).max(5),
+  retryAttempts: z.number().min(0).max(5),
+  retryDelaySeconds: z.number().min(1).max(60),
+  notificationSettings: z.object({
+    enabled: z.boolean(),
+    notifyOnFailure: z.boolean(),
+    notifyOnRecovery: z.boolean(),
+    alertRecipients: z.array(z.string().email()).optional(),
+    escalationDelayMinutes: z.number().min(5).max(1440).optional()
+  }),
+  checks: z.array(z.object({
+    name: z.string().min(1).max(100),
+    type: z.enum(['http', 'tcp', 'database', 'filesystem', 'memory', 'cpu', 'disk', 'custom']),
+    enabled: z.boolean(),
+    endpoint: z.string().optional(),
+    port: z.number().min(1).max(65535).optional(),
+    timeoutSeconds: z.number().min(1).max(300).optional(),
+    expectedStatus: z.number().min(100).max(599).optional(),
+    expectedResponse: z.string().optional(),
+    headers: z.record(z.string(), z.string()).optional(),
+    databaseQuery: z.string().optional(),
+    filesystemPath: z.string().optional(),
+    thresholdWarning: z.number().optional(),
+    thresholdCritical: z.number().optional()
+  })).min(1)
+});
+
+export type HealthCheckConfig = z.infer<typeof healthCheckConfigSchema>;
+
 export function validateOCSPRequest(request: any): { isValid: boolean; errors: string[] } {
   try {
     ocspRequestSchema.parse(request);
@@ -355,16 +390,6 @@ export function validateOCSPRequest(request: any): { isValid: boolean; errors: s
   }
 }
 
-// Health Check Configuration Validation
-export const healthCheckConfigSchema = z.object({
-  enabled: z.boolean(),
-  intervalMinutes: z.number().min(1).max(60),
-  timeoutSeconds: z.number().min(5).max(300),
-  failureThreshold: z.number().min(1).max(10),
-});
-
-export type HealthCheckConfig = z.infer<typeof healthCheckConfigSchema>;
-
 export function validateHealthCheckConfig(config: any): { isValid: boolean; errors: string[] } {
   try {
     healthCheckConfigSchema.parse(config);
@@ -379,6 +404,8 @@ export function validateHealthCheckConfig(config: any): { isValid: boolean; erro
     return { isValid: false, errors: ['Invalid health check configuration format'] };
   }
 }
+
+
 
 // Performance Metrics Configuration Validation
 export const performanceMetricsConfigSchema = z.object({
