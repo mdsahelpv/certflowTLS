@@ -60,30 +60,7 @@ export function validateSessionConfig(config: any): { isValid: boolean; errors: 
   }
 }
 
-// MFA Configuration Validation
-export const mfaConfigSchema = z.object({
-  enabled: z.boolean(),
-  requiredForAdmins: z.boolean(),
-  allowedMethods: z.array(z.enum(['totp', 'email', 'sms'])).min(1),
-  gracePeriodHours: z.number().min(0).max(168),
-});
 
-export type MFAConfig = z.infer<typeof mfaConfigSchema>;
-
-export function validateMFAConfig(config: any): { isValid: boolean; errors: string[] } {
-  try {
-    mfaConfigSchema.parse(config);
-    return { isValid: true, errors: [] };
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return {
-        isValid: false,
-        errors: error.issues.map(err => `${err.path.join('.')}: ${err.message}`)
-      };
-    }
-    return { isValid: false, errors: ['Invalid MFA configuration format'] };
-  }
-}
 
 // Audit Configuration Validation
 export const auditConfigSchema = z.object({
@@ -91,6 +68,10 @@ export const auditConfigSchema = z.object({
   logLevel: z.enum(['error', 'warn', 'info', 'debug']),
   retentionDays: z.number().min(30).max(3650),
   alertOnSuspicious: z.boolean(),
+  maxLogSize: z.number().min(10).max(1000), // MB
+  compressOldLogs: z.boolean(),
+  externalLogging: z.boolean(),
+  logSensitiveOperations: z.boolean(),
 });
 
 export type AuditConfig = z.infer<typeof auditConfigSchema>;
@@ -344,6 +325,8 @@ export function validateWebhookConfig(config: any): { isValid: boolean; errors: 
   }
 }
 
+
+
 // General Settings Validation
 export function validateSystemConfig(key: string, value: any): { isValid: boolean; errors: string[] } {
   const errors: string[] = [];
@@ -430,7 +413,6 @@ export function validateAllSettings(settings: Record<string, any>): ValidationRe
 export const SettingsValidation = {
   validatePasswordPolicy,
   validateSessionConfig,
-  validateMFAConfig,
   validateAuditConfig,
   validateCARenewalPolicy,
   validateCertificateTemplate,
