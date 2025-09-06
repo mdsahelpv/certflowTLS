@@ -1,0 +1,330 @@
+{
+  "dashboard": {
+    "title": "Certificate Authority Management System - Production Monitoring",
+    "description": "Comprehensive monitoring dashboard for CA management system",
+    "version": "1.0",
+    "lastUpdated": "2025-09-06"
+  },
+  "panels": [
+    {
+      "id": "system-overview",
+      "title": "System Overview",
+      "type": "status",
+      "position": { "x": 0, "y": 0, "width": 12, "height": 3 },
+      "metrics": [
+        {
+          "name": "Application Status",
+          "query": "up{job='ca-management'}",
+          "type": "gauge",
+          "thresholds": { "warning": 0.5, "critical": 0 },
+          "description": "Application availability status"
+        },
+        {
+          "name": "Database Connections",
+          "query": "pg_stat_activity_count{datname='ca_database'}",
+          "type": "number",
+          "thresholds": { "warning": 50, "critical": 80 },
+          "description": "Active database connections"
+        },
+        {
+          "name": "Response Time",
+          "query": "http_request_duration_seconds{quantile='0.95'}",
+          "type": "number",
+          "unit": "seconds",
+          "thresholds": { "warning": 3, "critical": 5 },
+          "description": "95th percentile response time"
+        }
+      ]
+    },
+    {
+      "id": "application-health",
+      "title": "Application Health",
+      "type": "graph",
+      "position": { "x": 0, "y": 3, "width": 6, "height": 4 },
+      "metrics": [
+        {
+          "name": "HTTP Requests",
+          "query": "rate(http_requests_total[5m])",
+          "type": "line",
+          "color": "#2196F3",
+          "description": "HTTP request rate per second"
+        },
+        {
+          "name": "Error Rate",
+          "query": "rate(http_requests_total{status=~'5..'}[5m]) / rate(http_requests_total[5m]) * 100",
+          "type": "line",
+          "color": "#F44336",
+          "unit": "percent",
+          "description": "HTTP error rate percentage"
+        },
+        {
+          "name": "Active Users",
+          "query": "count by (session) (increase(nextauth_sessions_total[5m]))",
+          "type": "line",
+          "color": "#4CAF50",
+          "description": "Active user sessions"
+        }
+      ]
+    },
+    {
+      "id": "certificate-operations",
+      "title": "Certificate Operations",
+      "type": "graph",
+      "position": { "x": 6, "y": 3, "width": 6, "height": 4 },
+      "metrics": [
+        {
+          "name": "Certificates Issued",
+          "query": "rate(certificate_issued_total[1h])",
+          "type": "bar",
+          "color": "#2196F3",
+          "description": "Certificates issued per hour"
+        },
+        {
+          "name": "Certificates Revoked",
+          "query": "rate(certificate_revoked_total[1h])",
+          "type": "bar",
+          "color": "#F44336",
+          "description": "Certificates revoked per hour"
+        },
+        {
+          "name": "CRL Updates",
+          "query": "rate(crl_generated_total[1h])",
+          "type": "bar",
+          "color": "#FF9800",
+          "description": "CRL updates per hour"
+        }
+      ]
+    },
+    {
+      "id": "system-resources",
+      "title": "System Resources",
+      "type": "graph",
+      "position": { "x": 0, "y": 7, "width": 4, "height": 4 },
+      "metrics": [
+        {
+          "name": "CPU Usage",
+          "query": "100 - (avg by (instance) (irate(node_cpu_seconds_total{mode='idle'}[5m])) * 100)",
+          "type": "area",
+          "color": "#2196F3",
+          "unit": "percent",
+          "thresholds": { "warning": 80, "critical": 90 },
+          "description": "CPU utilization percentage"
+        },
+        {
+          "name": "Memory Usage",
+          "query": "100 - ((node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * 100)",
+          "type": "area",
+          "color": "#4CAF50",
+          "unit": "percent",
+          "thresholds": { "warning": 85, "critical": 95 },
+          "description": "Memory utilization percentage"
+        },
+        {
+          "name": "Disk Usage",
+          "query": "(node_filesystem_size_bytes - node_filesystem_free_bytes) / node_filesystem_size_bytes * 100",
+          "type": "area",
+          "color": "#FF9800",
+          "unit": "percent",
+          "thresholds": { "warning": 80, "critical": 90 },
+          "description": "Disk utilization percentage"
+        }
+      ]
+    },
+    {
+      "id": "database-performance",
+      "title": "Database Performance",
+      "type": "graph",
+      "position": { "x": 4, "y": 7, "width": 4, "height": 4 },
+      "metrics": [
+        {
+          "name": "Query Time",
+          "query": "histogram_quantile(0.95, rate(pg_stat_statements_query_time_bucket[5m]))",
+          "type": "line",
+          "color": "#2196F3",
+          "unit": "seconds",
+          "thresholds": { "warning": 1, "critical": 3 },
+          "description": "95th percentile query execution time"
+        },
+        {
+          "name": "Active Connections",
+          "query": "pg_stat_activity_count{state='active'}",
+          "type": "line",
+          "color": "#4CAF50",
+          "thresholds": { "warning": 20, "critical": 50 },
+          "description": "Active database connections"
+        },
+        {
+          "name": "Cache Hit Ratio",
+          "query": "pg_stat_database_blks_hit / (pg_stat_database_blks_hit + pg_stat_database_blks_read) * 100",
+          "type": "line",
+          "color": "#FF9800",
+          "unit": "percent",
+          "thresholds": { "warning": 95, "critical": 90 },
+          "description": "Database cache hit ratio"
+        }
+      ]
+    },
+    {
+      "id": "security-events",
+      "title": "Security Events",
+      "type": "table",
+      "position": { "x": 8, "y": 7, "width": 4, "height": 4 },
+      "metrics": [
+        {
+          "name": "Failed Logins",
+          "query": "rate(auth_failed_total[1h])",
+          "type": "number",
+          "color": "#F44336",
+          "description": "Failed authentication attempts per hour"
+        },
+        {
+          "name": "Suspicious Activity",
+          "query": "rate(security_alert_total[1h])",
+          "type": "number",
+          "color": "#FF9800",
+          "description": "Security alerts per hour"
+        },
+        {
+          "name": "Audit Events",
+          "query": "rate(audit_log_total[1h])",
+          "type": "number",
+          "color": "#2196F3",
+          "description": "Audit log events per hour"
+        }
+      ]
+    },
+    {
+      "id": "certificate-expiry-alerts",
+      "title": "Certificate Expiry Alerts",
+      "type": "table",
+      "position": { "x": 0, "y": 11, "width": 6, "height": 3 },
+      "query": "certificate_expiry_days < 30",
+      "columns": [
+        { "name": "Subject", "field": "subject_dn" },
+        { "name": "Serial", "field": "serial_number" },
+        { "name": "Days Left", "field": "expiry_days", "color": "warning" },
+        { "name": "Type", "field": "certificate_type" }
+      ],
+      "description": "Certificates expiring within 30 days"
+    },
+    {
+      "id": "recent-audit-events",
+      "title": "Recent Audit Events",
+      "type": "table",
+      "position": { "x": 6, "y": 11, "width": 6, "height": 3 },
+      "query": "audit_log_timestamp > now() - 1h",
+      "columns": [
+        { "name": "Time", "field": "timestamp" },
+        { "name": "Action", "field": "action" },
+        { "name": "User", "field": "username" },
+        { "name": "IP", "field": "ip_address" },
+        { "name": "Details", "field": "description" }
+      ],
+      "description": "Recent security and administrative events"
+    }
+  ],
+  "alerts": [
+    {
+      "name": "High CPU Usage",
+      "query": "100 - (avg by (instance) (irate(node_cpu_seconds_total{mode='idle'}[5m])) * 100) > 90",
+      "severity": "critical",
+      "message": "CPU usage is above 90%",
+      "channels": ["email", "slack"]
+    },
+    {
+      "name": "High Memory Usage",
+      "query": "100 - ((node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * 100) > 95",
+      "severity": "critical",
+      "message": "Memory usage is above 95%",
+      "channels": ["email", "slack"]
+    },
+    {
+      "name": "Application Down",
+      "query": "up{job='ca-management'} == 0",
+      "severity": "critical",
+      "message": "Certificate Authority application is down",
+      "channels": ["email", "slack", "sms"]
+    },
+    {
+      "name": "Database Connection Issues",
+      "query": "pg_stat_activity_count{datname='ca_database'} > 80",
+      "severity": "warning",
+      "message": "High database connection count detected",
+      "channels": ["email"]
+    },
+    {
+      "name": "Certificate Expiring Soon",
+      "query": "certificate_expiry_days < 7",
+      "severity": "warning",
+      "message": "Certificate expiring within 7 days",
+      "channels": ["email"]
+    },
+    {
+      "name": "Security Alert",
+      "query": "rate(security_alert_total[5m]) > 5",
+      "severity": "warning",
+      "message": "Multiple security alerts detected",
+      "channels": ["email", "slack"]
+    }
+  ],
+  "notification_channels": {
+    "email": {
+      "type": "email",
+      "recipients": ["admin@company.com", "security@company.com"],
+      "smtp": {
+        "host": "smtp.company.com",
+        "port": 587,
+        "secure": false
+      }
+    },
+    "slack": {
+      "type": "slack",
+      "webhook_url": "https://hooks.slack.com/services/...",
+      "channel": "#alerts"
+    },
+    "sms": {
+      "type": "twilio",
+      "account_sid": "AC...",
+      "auth_token": "your_auth_token",
+      "from_number": "+1234567890",
+      "to_numbers": ["+0987654321"]
+    }
+  },
+  "data_sources": {
+    "prometheus": {
+      "url": "http://prometheus.company.com:9090",
+      "scrape_interval": "15s"
+    },
+    "loki": {
+      "url": "http://loki.company.com:3100",
+      "query_range": "1h"
+    },
+    "postgres": {
+      "host": "db.company.com",
+      "port": 5432,
+      "database": "ca_database",
+      "username": "monitoring_user",
+      "password": "encrypted_password"
+    }
+  },
+  "maintenance_windows": [
+    {
+      "name": "Weekly Maintenance",
+      "schedule": "0 2 * * 0",
+      "duration": "2h",
+      "description": "Weekly system maintenance window"
+    },
+    {
+      "name": "Monthly Patching",
+      "schedule": "0 1 1 * *",
+      "duration": "4h",
+      "description": "Monthly security patching window"
+    }
+  ],
+  "sla_targets": {
+    "availability": "99.9%",
+    "response_time": "< 2 seconds",
+    "error_rate": "< 0.1%",
+    "certificate_issuance": "< 30 seconds"
+  }
+}
