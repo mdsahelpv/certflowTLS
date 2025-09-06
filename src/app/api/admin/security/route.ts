@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
+import { SettingsValidation } from '@/lib/settings-validation';
+import { AuditService } from '@/lib/audit';
+import { SettingsCacheService } from '@/lib/settings-cache';
 
 // Security configuration interface
 interface SecurityConfig {
@@ -19,12 +22,6 @@ interface SecurityConfig {
     maxConcurrentSessions: number;
     extendOnActivity: boolean;
     rememberMeDays: number;
-  };
-  mfaConfig: {
-    enabled: boolean;
-    requiredForAdmins: boolean;
-    allowedMethods: string[];
-    gracePeriodHours: number;
   };
   auditConfig: {
     enabled: boolean;
@@ -48,34 +45,39 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
     }
 
-    // Get security configuration from environment or database
+    // Get security configuration from database with caching
+    const [
+      passwordPolicy,
+      sessionConfig,
+      auditConfig
+    ] = await Promise.all([
+      SettingsCacheService.getSecurityPolicy('password_policy'),
+      SettingsCacheService.getSecurityPolicy('session_config'),
+      SettingsCacheService.getSecurityPolicy('audit_config')
+    ]);
+
+    // Build response configuration
     const config: SecurityConfig = {
-      passwordPolicy: {
-        minLength: parseInt(process.env.PASSWORD_MIN_LENGTH || '8'),
-        requireUppercase: process.env.PASSWORD_REQUIRE_UPPERCASE === 'true',
-        requireLowercase: process.env.PASSWORD_REQUIRE_LOWERCASE === 'true',
-        requireNumbers: process.env.PASSWORD_REQUIRE_NUMBERS === 'true',
-        requireSpecialChars: process.env.PASSWORD_REQUIRE_SPECIAL === 'true',
-        preventReuse: parseInt(process.env.PASSWORD_PREVENT_REUSE || '5'),
-        expiryDays: parseInt(process.env.PASSWORD_EXPIRY_DAYS || '90'),
+      passwordPolicy: passwordPolicy?.config || {
+        minLength: 8,
+        requireUppercase: true,
+        requireLowercase: true,
+        requireNumbers: true,
+        requireSpecialChars: true,
+        preventReuse: 5,
+        expiryDays: 90,
       },
-      sessionConfig: {
-        timeoutMinutes: parseInt(process.env.SESSION_TIMEOUT_MINUTES || '30'),
-        maxConcurrentSessions: parseInt(process.env.MAX_CONCURRENT_SESSIONS || '5'),
-        extendOnActivity: process.env.SESSION_EXTEND_ON_ACTIVITY === 'true',
-        rememberMeDays: parseInt(process.env.REMEMBER_ME_DAYS || '30'),
+      sessionConfig: sessionConfig?.config || {
+        timeoutMinutes: 30,
+        maxConcurrentSessions: 5,
+        extendOnActivity: true,
+        rememberMeDays: 30,
       },
-      mfaConfig: {
-        enabled: process.env.MFA_ENABLED === 'true',
-        requiredForAdmins: process.env.MFA_REQUIRED_ADMINS === 'true',
-        allowedMethods: (process.env.MFA_ALLOWED_METHODS || 'totp,email').split(','),
-        gracePeriodHours: parseInt(process.env.MFA_GRACE_PERIOD_HOURS || '24'),
-      },
-      auditConfig: {
-        enabled: process.env.AUDIT_ENABLED === 'true',
-        logLevel: process.env.AUDIT_LOG_LEVEL || 'info',
-        retentionDays: parseInt(process.env.AUDIT_RETENTION_DAYS || '365'),
-        alertOnSuspicious: process.env.AUDIT_ALERT_SUSPICIOUS === 'true',
+      auditConfig: auditConfig?.config || {
+        enabled: true,
+        logLevel: 'info',
+        retentionDays: 365,
+        alertOnSuspicious: true,
       },
     };
 
@@ -102,62 +104,119 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const { action, config: updateConfig } = body;
+    const userId = (session.user as any).id;
+    const username = (session.user as any).username || session.user.email;
 
     switch (action) {
       case 'updatePasswordPolicy':
-        // Update password policy settings
-        if (updateConfig.passwordPolicy) {
-          const policy = updateConfig.passwordPolicy;
-          process.env.PASSWORD_MIN_LENGTH = policy.minLength?.toString();
-          process.env.PASSWORD_REQUIRE_UPPERCASE = policy.requireUppercase?.toString();
-          process.env.PASSWORD_REQUIRE_LOWERCASE = policy.requireLowercase?.toString();
-          process.env.PASSWORD_REQUIRE_NUMBERS = policy.requireNumbers?.toString();
-          process.env.PASSWORD_REQUIRE_SPECIAL = policy.requireSpecialChars?.toString();
-          process.env.PASSWORD_PREVENT_REUSE = policy.preventReuse?.toString();
-          process.env.PASSWORD_EXPIRY_DAYS = policy.expiryDays?.toString();
+        // Validate password policy
+        if (!updateConfig.passwordPolicy) {
+          return NextResponse.json({ error: 'Password policy configuration is required' }, { status: 400 });
         }
+
+        const passwordValidation = SettingsValidation.validatePasswordPolicy(updateConfig.passwordPolicy);
+        if (!passwordValidation.isValid) {
+          return NextResponse.json({
+            error: 'Invalid password policy configuration',
+            details: passwordValidation.errors
+          }, { status: 400 });
+        }
+
+        // Get current policy for audit logging
+        const currentPasswordPolicy = await SettingsCacheService.getSecurityPolicy('password_policy');
+
+        // Update password policy in database
+        await SettingsCacheService.setSecurityPolicy(
+          'password_policy',
+          'Password Policy',
+          updateConfig.passwordPolicy,
+          userId
+        );
+
+        // Log the change
+        await AuditService.logPasswordPolicyChange(
+          userId,
+          username,
+          currentPasswordPolicy?.config,
+          updateConfig.passwordPolicy
+        );
+
         return NextResponse.json({
           success: true,
           message: 'Password policy updated successfully'
         });
 
       case 'updateSessionConfig':
-        // Update session configuration
-        if (updateConfig.sessionConfig) {
-          const session = updateConfig.sessionConfig;
-          process.env.SESSION_TIMEOUT_MINUTES = session.timeoutMinutes?.toString();
-          process.env.MAX_CONCURRENT_SESSIONS = session.maxConcurrentSessions?.toString();
-          process.env.SESSION_EXTEND_ON_ACTIVITY = session.extendOnActivity?.toString();
-          process.env.REMEMBER_ME_DAYS = session.rememberMeDays?.toString();
+        // Validate session configuration
+        if (!updateConfig.sessionConfig) {
+          return NextResponse.json({ error: 'Session configuration is required' }, { status: 400 });
         }
+
+        const sessionValidation = SettingsValidation.validateSessionConfig(updateConfig.sessionConfig);
+        if (!sessionValidation.isValid) {
+          return NextResponse.json({
+            error: 'Invalid session configuration',
+            details: sessionValidation.errors
+          }, { status: 400 });
+        }
+
+        // Get current config for audit logging
+        const currentSessionConfig = await SettingsCacheService.getSecurityPolicy('session_config');
+
+        // Update session configuration in database
+        await SettingsCacheService.setSecurityPolicy(
+          'session_config',
+          'Session Configuration',
+          updateConfig.sessionConfig,
+          userId
+        );
+
+        // Log the change
+        await AuditService.logSessionConfigChange(
+          userId,
+          username,
+          currentSessionConfig?.config,
+          updateConfig.sessionConfig
+        );
+
         return NextResponse.json({
           success: true,
           message: 'Session configuration updated successfully'
         });
 
-      case 'updateMfaConfig':
-        // Update MFA configuration
-        if (updateConfig.mfaConfig) {
-          const mfa = updateConfig.mfaConfig;
-          process.env.MFA_ENABLED = mfa.enabled?.toString();
-          process.env.MFA_REQUIRED_ADMINS = mfa.requiredForAdmins?.toString();
-          process.env.MFA_ALLOWED_METHODS = mfa.allowedMethods?.join(',');
-          process.env.MFA_GRACE_PERIOD_HOURS = mfa.gracePeriodHours?.toString();
-        }
-        return NextResponse.json({
-          success: true,
-          message: 'MFA configuration updated successfully'
-        });
-
       case 'updateAuditConfig':
-        // Update audit configuration
-        if (updateConfig.auditConfig) {
-          const audit = updateConfig.auditConfig;
-          process.env.AUDIT_ENABLED = audit.enabled?.toString();
-          process.env.AUDIT_LOG_LEVEL = audit.logLevel;
-          process.env.AUDIT_RETENTION_DAYS = audit.retentionDays?.toString();
-          process.env.AUDIT_ALERT_SUSPICIOUS = audit.alertOnSuspicious?.toString();
+        // Validate audit configuration
+        if (!updateConfig.auditConfig) {
+          return NextResponse.json({ error: 'Audit configuration is required' }, { status: 400 });
         }
+
+        const auditValidation = SettingsValidation.validateAuditConfig(updateConfig.auditConfig);
+        if (!auditValidation.isValid) {
+          return NextResponse.json({
+            error: 'Invalid audit configuration',
+            details: auditValidation.errors
+          }, { status: 400 });
+        }
+
+        // Get current config for audit logging
+        const currentAuditConfig = await SettingsCacheService.getSecurityPolicy('audit_config');
+
+        // Update audit configuration in database
+        await SettingsCacheService.setSecurityPolicy(
+          'audit_config',
+          'Audit Configuration',
+          updateConfig.auditConfig,
+          userId
+        );
+
+        // Log the change
+        await AuditService.logAuditConfigChange(
+          userId,
+          username,
+          currentAuditConfig?.config,
+          updateConfig.auditConfig
+        );
+
         return NextResponse.json({
           success: true,
           message: 'Audit configuration updated successfully'

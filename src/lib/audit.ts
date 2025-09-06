@@ -292,7 +292,7 @@ export class AuditService {
     // Get all unique keys from both objects
     const allKeys = new Set([...Object.keys(oldSettings), ...Object.keys(newSettings)]);
 
-    for (const key of allKeys) {
+    for (const key of Array.from(allKeys)) {
       const oldValue = oldSettings[key];
       const newValue = newSettings[key];
 

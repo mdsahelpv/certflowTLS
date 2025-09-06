@@ -8,8 +8,8 @@
 import { db } from '@/lib/db';
 import { AuditService } from './audit';
 import { SettingsValidation } from './settings-validation';
-import fs from 'fs';
-import path from 'path';
+import * as fs from 'fs';
+import * as path from 'path';
 import { promisify } from 'util';
 
 // Backup metadata interface

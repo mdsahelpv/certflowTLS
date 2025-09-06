@@ -23,11 +23,11 @@ This document outlines the complete implementation plan to make the admin settin
 ## Phase 2: Security Settings API
 
 ### 2.1 Password Policy API
-- [ ] **Create `/api/admin/security` endpoint** (GET/POST)
-- [ ] **Implement password policy validation** (server-side)
-- [ ] **Add password policy storage** in database
-- [ ] **Create password policy enforcement** middleware
-- [ ] **Add password expiry notifications**
+- [x] **Create `/api/admin/security` endpoint** (GET/POST)
+- [x] **Implement password policy validation** (server-side)
+- [x] **Add password policy storage** in database
+- [x] **Create password policy enforcement** middleware
+- [x] **Add password expiry notifications**
 
 ### 2.2 Session Management API
 - [ ] **Implement session timeout configuration**

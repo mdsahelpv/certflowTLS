@@ -123,12 +123,19 @@ class SettingsCache {
   // Invalidate cache entries by pattern
   invalidate(pattern: string): number {
     let invalidated = 0;
-    for (const key of this.cache.keys()) {
-      if (key.includes(pattern)) {
-        this.cache.delete(key);
-        invalidated++;
+    const keysToDelete: string[] = [];
+
+    for (const key of Array.from(this.cache.keys())) {
+      if (key.startsWith(pattern)) {
+        keysToDelete.push(key);
       }
     }
+
+    for (const key of keysToDelete) {
+      this.cache.delete(key);
+      invalidated++;
+    }
+
     this.stats.entries = this.cache.size;
     return invalidated;
   }
@@ -149,7 +156,7 @@ class SettingsCache {
     let oldestKey: string | null = null;
     let oldestTime = Date.now();
 
-    for (const [key, entry] of this.cache.entries()) {
+    for (const [key, entry] of Array.from(this.cache.entries())) {
       if (entry.lastAccessed < oldestTime) {
         oldestTime = entry.lastAccessed;
         oldestKey = key;
@@ -174,7 +181,7 @@ class SettingsCache {
     const now = Date.now();
     let evicted = 0;
 
-    for (const [key, entry] of this.cache.entries()) {
+    for (const [key, entry] of Array.from(this.cache.entries())) {
       if (now - entry.timestamp > entry.ttl) {
         this.cache.delete(key);
         evicted++;
