@@ -484,6 +484,7 @@ export function validateResourceLimitsConfig(config: any): { isValid: boolean; e
 
 // Email/SMTP Configuration Validation
 export const smtpConfigSchema = z.object({
+  enabled: z.boolean(),
   host: z.string().min(1),
   port: z.number().min(1).max(65535),
   secure: z.boolean(),
@@ -491,6 +492,67 @@ export const smtpConfigSchema = z.object({
   password: z.string().min(1),
   fromEmail: z.string().email(),
   fromName: z.string().min(1),
+  replyToEmail: z.string().email().optional(),
+  connectionTimeout: z.number().min(5000).max(60000).optional(),
+  greetingTimeout: z.number().min(5000).max(60000).optional(),
+  socketTimeout: z.number().min(5000).max(60000).optional(),
+  pool: z.boolean().optional(),
+  maxConnections: z.number().min(1).max(10).optional(),
+  rateLimit: z.number().min(1).max(100).optional(),
+  tls: z.object({
+    rejectUnauthorized: z.boolean().optional(),
+    minVersion: z.enum(['TLSv1', 'TLSv1.1', 'TLSv1.2', 'TLSv1.3']).optional(),
+    ciphers: z.string().optional()
+  }).optional()
+});
+
+// Email Template Configuration Validation
+export const emailTemplateSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1).max(100),
+  subject: z.string().min(1).max(200),
+  htmlBody: z.string().min(1),
+  textBody: z.string().optional(),
+  variables: z.array(z.object({
+    name: z.string().min(1),
+    type: z.enum(['string', 'number', 'boolean', 'date']),
+    required: z.boolean(),
+    defaultValue: z.any().optional(),
+    description: z.string().optional()
+  })).optional(),
+  category: z.enum(['security', 'certificate', 'system', 'notification', 'alert']),
+  enabled: z.boolean()
+});
+
+// Notification Settings Validation
+export const notificationSettingsSchema = z.object({
+  enabled: z.boolean(),
+  emailNotifications: z.boolean(),
+  webhookNotifications: z.boolean(),
+  slackNotifications: z.boolean(),
+  smsNotifications: z.boolean(),
+  notificationTypes: z.array(z.enum([
+    'certificate_expiring',
+    'certificate_expired',
+    'certificate_revoked',
+    'security_alert',
+    'system_health',
+    'performance_alert',
+    'user_action',
+    'admin_action'
+  ])),
+  escalationSettings: z.object({
+    enabled: z.boolean(),
+    escalationDelayMinutes: z.number().min(5).max(1440),
+    escalationRecipients: z.array(z.string().email()).optional(),
+    maxEscalationLevels: z.number().min(1).max(5).optional()
+  }).optional(),
+  quietHours: z.object({
+    enabled: z.boolean(),
+    startTime: z.string().regex(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/),
+    endTime: z.string().regex(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/),
+    timezone: z.string().optional()
+  }).optional()
 });
 
 export type SMTPConfig = z.infer<typeof smtpConfigSchema>;
