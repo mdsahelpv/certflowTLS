@@ -41,7 +41,7 @@ global.clearImmediate = global.clearImmediate || ((id: any) => clearTimeout(id))
 (process.env as any).NODE_ENV = 'test';
 process.env.NEXTAUTH_SECRET = 'test-secret';
 process.env.ENCRYPTION_KEY = 'test-key-32-characters-long';
-process.env.DATABASE_URL = 'file:./prisma/db/custom.db';
+process.env.DATABASE_URL = 'file:./db/custom.db';
 
 // Mock matchMedia for UI components depending on next-themes or media queries
 if (!(global as any).window) (global as any).window = {} as any;
