@@ -120,3 +120,28 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Custom Shield Floating Animation */
+@keyframes shield-float {
+  0%, 100% {
+    transform: translateY(0px) translateX(0px) rotate(0deg);
+    filter: drop-shadow(0 10px 15px rgb(37 99 235 / 0.2));
+  }
+  25% {
+    transform: translateY(-8px) translateX(3px) rotate(2deg);
+    filter: drop-shadow(0 12px 20px rgb(37 99 235 / 0.3));
+  }
+  50% {
+    transform: translateY(-12px) translateX(0px) rotate(0deg);
+    filter: drop-shadow(0 15px 25px rgb(37 99 235 / 0.4));
+  }
+  75% {
+    transform: translateY(-8px) translateX(-3px) rotate(-2deg);
+    filter: drop-shadow(0 12px 20px rgb(37 99 235 / 0.3));
+  }
+}
+
+.animate-shield-float {
+  animation: shield-float 4s ease-in-out infinite;
+  transform-origin: center bottom;
+}
