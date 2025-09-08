@@ -6,6 +6,15 @@ import { logger as edgeLogger, createRequestLogger as createEdgeRequestLogger } 
 
 const logFile = process.env.LOG_FILE;
 
+// Environment detection based on DEPLOYMENT_TYPE from env files
+const deploymentType = process.env.DEPLOYMENT_TYPE;
+
+const isProduction = deploymentType === 'production';
+const isDevelopment = deploymentType === 'development';
+
+// Only use file logging in development environments
+const useFileLogging = isDevelopment && logFile && process.env.NODE_ENV !== 'test';
+
 // Ensure logs directory exists
 if (logFile && process.env.NODE_ENV === 'production') {
   const logDir = path.dirname(logFile);
@@ -18,7 +27,7 @@ let logWriteCount = 0;
 const ROTATION_CHECK_INTERVAL = 100;
 
 async function writeToFile(logEntry: string): Promise<void> {
-  if (logFile && process.env.NODE_ENV === 'production') {
+  if (useFileLogging && logFile) {
     try {
       fs.appendFileSync(logFile, logEntry + '\n');
       logWriteCount++;

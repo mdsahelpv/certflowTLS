@@ -14,6 +14,13 @@ services:
     volumes:
       - ./db:/app/db:rw
     restart: unless-stopped
+    # Docker logging driver for containerized deployments
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+        labels: "app,ca-management"
     depends_on:
       postgres:
         condition: service_healthy
