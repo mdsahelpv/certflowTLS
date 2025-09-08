@@ -3,8 +3,7 @@ FROM node:18-alpine AS base
 
 # Install dependencies only when needed
 FROM base AS deps
-# Check https://github.com/nodejs/docker-node/tree/b4117f9333da4138b03a546ec926ef50a31506c3#nodealpine to understand why libc6-compat might be needed.
-RUN apk add --no-cache libc6-compat
+# Note: libc6-compat removed due to Alpine mirror issues - not needed for this Node.js app
 WORKDIR /app
 
 # Install dependencies based on the preferred package manager
@@ -18,9 +17,13 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY package.json package-lock.json* ./
 COPY prisma ./prisma
 COPY src ./src
-COPY server.ts next.config.mjs tsconfig.json ./
+COPY public ./public
+COPY server.ts next.config.mjs tsconfig.json create-admin.js ./
 
-# Generate Prisma client
+# Use PostgreSQL schema for Prisma client generation
+RUN cp prisma/schema.prisma.psql prisma/schema.prisma
+
+# Generate Prisma client with PostgreSQL schema
 RUN npx prisma generate
 
 # Build the application (Next standalone output is still produced, but we will run custom server)

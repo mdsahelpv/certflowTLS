@@ -16,6 +16,7 @@ services:
     volumes:
       - ./logs:/app/logs:rw
       - ./db:/app/db:rw
+      - ./node_modules:/app/node_modules:rw
     restart: unless-stopped
     depends_on:
       postgres:
@@ -41,16 +42,14 @@ services:
         window: 120s
     command: >
       sh -c "
-        echo '⏳ Waiting for PostgreSQL to be ready...' &&
-        until pg_isready -h postgres -U \$POSTGRES_USER -d \$POSTGRES_DB; do
-          echo 'PostgreSQL is unavailable - sleeping' &&
-          sleep 2
+        echo '✅ PostgreSQL dependency satisfied!' &&
+        echo '⏳ Waiting for PostgreSQL to be fully ready...' &&
+        sleep 10 &&
+        echo '🔍 Testing database connection...' &&
+        until PGPASSWORD=ca_management_password_2024 psql -h postgres -U postgres -d ca_management -c 'SELECT 1' >/dev/null 2>&1; do
+          echo 'Database connection failed, waiting...' &&
+          sleep 3
         done &&
-        echo '✅ PostgreSQL is ready!' &&
-        echo '🔧 Using PostgreSQL schema...' &&
-        cp prisma/schema.prisma.psql prisma/schema.prisma &&
-        echo '🔧 Generating Prisma client...' &&
-        npx prisma generate &&
         echo '📊 Pushing database schema...' &&
         npx prisma db push &&
         echo '✅ Database initialized! Starting application...' &&

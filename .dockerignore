@@ -56,7 +56,7 @@ local-*
 # Package manager files
 yarn.lock
 pnpm-lock.yaml
-package-lock.json
+# package-lock.json is needed for npm ci
 
 # Testing
 jest.config.js
