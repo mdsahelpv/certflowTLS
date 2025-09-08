@@ -57,7 +57,7 @@ services:
         npx prisma db push &&
         echo '✅ Database initialized!' &&
         echo '🚀 Starting server on port \$PORT' &&
-        npx tsx server.ts
+        npx tsx start.js
       "
     user: nextjs
     environment:

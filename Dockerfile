@@ -33,7 +33,7 @@ COPY package.json package-lock.json* ./
 COPY prisma ./prisma
 COPY src ./src
 COPY public ./public
-COPY server.ts next.config.mjs tsconfig.json create-admin.js ./
+COPY server.ts start.js next.config.mjs tsconfig.json create-admin.js ./
 
 # Copy and rename schema if needed
 RUN cp prisma/schema.prisma.psql prisma/schema.prisma || true
@@ -77,4 +77,4 @@ ENV HOSTNAME=0.0.0.0
 ENTRYPOINT ["dumb-init", "--"]
 
 # Start the server
-CMD ["npx", "tsx", "server.ts"]
+CMD ["npx", "tsx", "start.js"]
