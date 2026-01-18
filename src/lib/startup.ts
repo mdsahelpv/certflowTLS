@@ -2,7 +2,6 @@ import { SystemInitializer } from '@/lib/init';
 import { logger } from '@/lib/logger';
 
 declare global {
-  // eslint-disable-next-line no-var
   var __app_init_promise__: Promise<void> | undefined;
 }
 
@@ -18,5 +17,5 @@ if (!global.__app_init_promise__) {
   })();
 }
 
-export {}; // side-effect module
+export { }; // side-effect module
 

@@ -1,4 +1,5 @@
 import { NotificationPayload } from './notifications';
+import crypto from 'crypto';
 
 export interface WebhookConfig {
   url: string;
@@ -67,7 +68,7 @@ export class WebhookService {
           };
         } else {
           lastError = `HTTP ${response.status}: ${response.statusText}`;
-          
+
           // Don't retry on client errors (4xx) except 429 (rate limit)
           if (response.status >= 400 && response.status < 500 && response.status !== 429) {
             break;
@@ -75,7 +76,7 @@ export class WebhookService {
         }
       } catch (error) {
         lastError = error instanceof Error ? error.message : String(error);
-        
+
         // Don't retry on network errors that are likely permanent
         if (this.isPermanentError(error)) {
           break;
@@ -83,7 +84,7 @@ export class WebhookService {
       }
 
       retries = attempt;
-      
+
       // Wait before retry (exponential backoff)
       if (attempt < maxRetries) {
         const delay = Math.min(retryDelay * Math.pow(2, attempt), this.MAX_RETRY_DELAY);
@@ -142,46 +143,33 @@ export class WebhookService {
   }
 
   /**
-   * Format webhook payload with standard structure
+   * Generate HMAC signature for webhook payload
+   */
+  private static generateWebhookSignature(payload: NotificationPayload, secret: string): string {
+    const hmac = crypto.createHmac('sha256', secret);
+    hmac.update(JSON.stringify(payload));
+    return `sha256=${hmac.digest('hex')}`;
+  }
+
+  /**
+   * Format payload for webhook delivery
    */
   private static formatWebhookPayload(payload: NotificationPayload): any {
     return {
-      event: payload.event,
-      subject: payload.subject,
-      message: payload.message,
-      metadata: payload.metadata || {},
+      id: crypto.randomUUID(),
       timestamp: new Date().toISOString(),
-      id: this.generateWebhookId()
+      ...payload
     };
   }
 
   /**
-   * Generate webhook signature for security
-   */
-  private static generateWebhookSignature(payload: NotificationPayload, secret: string): string {
-    const crypto = require('crypto');
-    const data = JSON.stringify(this.formatWebhookPayload(payload));
-    return crypto
-      .createHmac('sha256', secret)
-      .update(data)
-      .digest('hex');
-  }
-
-  /**
-   * Generate unique webhook ID
-   */
-  private static generateWebhookId(): string {
-    return `webhook_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  }
-
-  /**
-   * Check if error is permanent (should not retry)
+   * Check if error is permanent
    */
   private static isPermanentError(error: any): boolean {
     if (error instanceof TypeError && error.message.includes('fetch')) {
       return false; // Network errors should be retried
     }
-    
+
     if (error.name === 'AbortError') {
       return false; // Timeout errors should be retried
     }

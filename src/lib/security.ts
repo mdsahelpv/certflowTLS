@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { headers } from 'next/headers';
+import crypto from 'crypto';
 
 export class SecurityMiddleware {
   // Security headers
   static securityHeaders = {
-    'Content-Security-Policy': process.env.NODE_ENV === 'development' 
+    'Content-Security-Policy': process.env.NODE_ENV === 'development'
       ? "default-src *; script-src * 'unsafe-inline' 'unsafe-eval'; style-src * 'unsafe-inline'; img-src * data:; font-src * data:; connect-src * wss: https:; frame-ancestors *;"
       : "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' wss: https:; frame-ancestors 'none';",
     'X-Content-Type-Options': 'nosniff',
@@ -20,8 +21,8 @@ export class SecurityMiddleware {
     Object.entries(this.securityHeaders).forEach(([key, value]) => {
       if (value) { // Only set header if value is not empty
         // Skip iframe-related headers in development
-        if (process.env.NODE_ENV === 'development' && 
-            (key === 'X-Frame-Options' || key.includes('frame-ancestors'))) {
+        if (process.env.NODE_ENV === 'development' &&
+          (key === 'X-Frame-Options' || key.includes('frame-ancestors'))) {
           return;
         }
         response.headers.set(key, value);
@@ -34,21 +35,21 @@ export class SecurityMiddleware {
   static validateOrigin(request: NextRequest): boolean {
     const origin = request.headers.get('origin');
     const host = request.headers.get('host');
-    
+
     // Require Host header
     if (!host) return false;
 
     // If no Origin header (e.g., curl, same-origin navigations), allow
     if (!origin) return true;
-    
+
     // Allow same origin
     if (origin.includes(host)) return true;
-    
+
     // Allow localhost in development
     if (process.env.NODE_ENV === 'development' && origin.includes('localhost')) {
       return true;
     }
-    
+
     return false;
   }
 
@@ -87,7 +88,7 @@ export class SecurityMiddleware {
   // Sanitize user input
   static sanitizeInput(input: string): string {
     if (typeof input !== 'string') return input;
-    
+
     return input
       .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '') // Remove script tags
       .replace(/javascript:/gi, '') // Remove javascript protocol
@@ -143,7 +144,7 @@ export class SecurityMiddleware {
   // Validate CSR format
   static validateCSR(csr: string): boolean {
     if (typeof csr !== 'string') return false;
-    
+
     // Basic CSR validation
     const csrPattern = /-----BEGIN CERTIFICATE REQUEST-----[\s\S]+-----END CERTIFICATE REQUEST-----/;
     return csrPattern.test(csr);
@@ -152,7 +153,7 @@ export class SecurityMiddleware {
   // Validate certificate format
   static validateCertificate(cert: string): boolean {
     if (typeof cert !== 'string') return false;
-    
+
     // Basic certificate validation
     const certPattern = /-----BEGIN CERTIFICATE-----[\s\S]+-----END CERTIFICATE-----/;
     return certPattern.test(cert);
@@ -172,8 +173,6 @@ export class SecurityMiddleware {
 
   // Generate secure random token
   static generateSecureToken(length: number = 32): string {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const crypto = require('crypto');
     return crypto.randomBytes(length).toString('hex');
   }
 
@@ -240,7 +239,7 @@ export class SecurityMiddleware {
   static detectSuspiciousActivity(request: NextRequest): boolean {
     const userAgent = request.headers.get('user-agent') || '';
     const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown';
-    
+
     // Check for suspicious user agents
     const suspiciousAgents = [
       'sqlmap',
@@ -251,7 +250,7 @@ export class SecurityMiddleware {
       'curl',
       'wget',
     ];
-    
+
     if (suspiciousAgents.some(agent => userAgent.toLowerCase().includes(agent))) {
       return true;
     }
@@ -261,7 +260,7 @@ export class SecurityMiddleware {
       /(\d+)\1{3}/, // Repeated digits like 111.111.111.111
       /0{2,}/, // Multiple zeros
     ];
-    
+
     if (suspiciousPatterns.some(pattern => pattern.test(ip))) {
       return true;
     }

@@ -97,27 +97,6 @@ export default function AdminSettingsPage() {
     rateLimitRequestsPerMinute: 1000,
   });
 
-  if (!isAuthenticated || !session) {
-    return null;
-  }
-
-  const permissions = session.user.permissions as string[];
-
-  // Check if user has admin settings permission
-  if (!permissions.includes('config:manage')) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle className="text-center">Access Denied</CardTitle>
-            <CardDescription className="text-center">
-              You don't have permission to access admin settings.
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      </div>
-    );
-  }
 
   // Fetch system configuration
   const fetchSystemConfig = async () => {
@@ -278,6 +257,28 @@ export default function AdminSettingsPage() {
       fetchBackupHistory();
     }
   }, [activeTab]);
+
+  if (!isAuthenticated || !session) {
+    return null;
+  }
+
+  const permissions = session.user.permissions as string[];
+
+  // Check if user has admin settings permission
+  if (!permissions.includes('config:manage')) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle className="text-center">Access Denied</CardTitle>
+            <CardDescription className="text-center">
+              You don't have permission to access admin settings.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full p-6 pt-12 space-y-8 min-h-screen">

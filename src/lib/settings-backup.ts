@@ -11,6 +11,7 @@ import { SettingsValidation } from './settings-validation';
 import * as fs from 'fs';
 import * as path from 'path';
 import { promisify } from 'util';
+import crypto from 'crypto';
 
 // Backup metadata interface
 export interface BackupMetadata {
@@ -81,7 +82,6 @@ export class SettingsBackupService {
 
   // Generate checksum for backup integrity
   private static generateChecksum(data: any): string {
-    const crypto = require('crypto');
     const content = JSON.stringify(data, Object.keys(data).sort());
     return crypto.createHash('sha256').update(content).digest('hex');
   }

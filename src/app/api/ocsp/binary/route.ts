@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import forge from 'node-forge';
 import { db } from '@/lib/db';
 import { buildBasicOCSPResponseRSA } from '@/lib/ocsp';
+import { Encryption } from '@/lib/crypto';
 
 export async function POST(request: NextRequest) {
 	const contentType = request.headers.get('content-type') || '';
@@ -19,7 +20,7 @@ export async function POST(request: NextRequest) {
 				try {
 					serialHex = forge.util.bytesToHex(node.value);
 					return;
-				} catch {}
+				} catch { }
 			}
 			if (node.value && Array.isArray(node.value)) {
 				for (const child of node.value) visit(child);
@@ -43,7 +44,7 @@ export async function POST(request: NextRequest) {
 			return new NextResponse('tryLater', { status: 503 });
 		}
 		const enc = JSON.parse(ca.privateKey);
-		const caPriv = require('@/lib/crypto').Encryption.decrypt(enc.encrypted, enc.iv, enc.tag);
+		const caPriv = Encryption.decrypt(enc.encrypted, enc.iv, enc.tag);
 		const resp = buildBasicOCSPResponseRSA({
 			issuerCertPem: ca.certificate,
 			issuerPrivateKeyPem: caPriv,

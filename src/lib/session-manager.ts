@@ -7,6 +7,7 @@
 
 import { SettingsCacheService } from './settings-cache';
 import { AuditService } from './audit';
+import crypto from 'crypto';
 
 // Session information interface
 export interface SessionInfo {
@@ -80,9 +81,8 @@ export class SessionManager {
           .slice(0, sortedSessions.length - sessionsToKeep + 1)
           .map(s => s.id);
 
-        result.message = `Maximum concurrent sessions (${maxSessions}) exceeded. ${
-          result.sessionsToTerminate.length
-        } oldest sessions will be terminated.`;
+        result.message = `Maximum concurrent sessions (${maxSessions}) exceeded. ${result.sessionsToTerminate.length
+          } oldest sessions will be terminated.`;
       } else {
         result.message = `Session allowed. ${effectiveCount}/${maxSessions} sessions active.`;
       }
@@ -370,7 +370,7 @@ export class SessionManager {
       expiresAt.setDate(expiresAt.getDate() + rememberMeDays);
 
       // Generate secure token
-      const token = require('crypto').randomBytes(32).toString('hex');
+      const token = crypto.randomBytes(32).toString('hex');
 
       // Store token in your token store
       // TODO: Implement actual token storage

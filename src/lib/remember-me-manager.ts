@@ -8,6 +8,7 @@
 import { SettingsCacheService } from './settings-cache';
 import { AuditService } from './audit';
 import { db } from '@/lib/db';
+import crypto from 'crypto';
 
 // Remember me token interface
 export interface RememberMeToken {
@@ -47,7 +48,7 @@ export interface TokenValidationResult {
 export class RememberMeManager {
   // Generate secure random token
   private static generateSecureToken(): string {
-    return require('crypto').randomBytes(32).toString('hex');
+    return crypto.randomBytes(32).toString('hex');
   }
 
   // Create remember me token for user

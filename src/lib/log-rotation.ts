@@ -1,5 +1,8 @@
 import fs from 'fs';
 import path from 'path';
+import { createGzip } from 'zlib';
+import { pipeline } from 'stream/promises';
+import { createReadStream, createWriteStream } from 'fs';
 
 interface LogRotationConfig {
   logFile: string;
@@ -53,7 +56,7 @@ export class LogRotation {
     for (let i = this.config.maxFiles - 1; i >= 1; i--) {
       const currentLog = path.join(logDir, `${logBase}.${i}${logExt}`);
       const nextLog = path.join(logDir, `${logBase}.${i + 1}${logExt}`);
-      
+
       if (fs.existsSync(currentLog)) {
         fs.renameSync(currentLog, nextLog);
       }
@@ -87,10 +90,6 @@ export class LogRotation {
 
       if (fs.existsSync(logFile) && !fs.existsSync(gzFile)) {
         try {
-          const { createGzip } = require('zlib');
-          const { pipeline } = require('stream/promises');
-          const { createReadStream, createWriteStream } = require('fs');
-
           await pipeline(
             createReadStream(logFile),
             createGzip(),
@@ -117,12 +116,12 @@ export class LogRotation {
 
     try {
       const files = fs.readdirSync(logDir);
-      
+
       for (const file of files) {
         if (file.startsWith(logBase) && (file.endsWith(logExt) || file.endsWith('.gz'))) {
           const filePath = path.join(logDir, file);
           const stats = fs.statSync(filePath);
-          
+
           if (stats.mtime.getTime() < cutoffTime) {
             fs.unlinkSync(filePath);
             console.log(`Deleted old log file: ${file}`);

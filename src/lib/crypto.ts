@@ -24,12 +24,12 @@ export class Encryption {
   static encrypt(text: string): { encrypted: string; iv: string; tag: string } {
     const iv = crypto.randomBytes(16);
     const cipher = crypto.createCipheriv(this.algorithm as CipherGCMTypes, this.getKey(), iv) as unknown as CipherGCM;
-    
+
     let encrypted = cipher.update(text, 'utf8', 'hex');
     encrypted += cipher.final('hex');
-    
+
     const tag = cipher.getAuthTag();
-    
+
     return {
       encrypted,
       iv: iv.toString('hex'),
@@ -43,12 +43,12 @@ export class Encryption {
       this.getKey(),
       Buffer.from(iv, 'hex')
     ) as unknown as DecipherGCM;
-    
+
     decipher.setAuthTag(Buffer.from(tag, 'hex'));
-    
+
     let decrypted = decipher.update(encrypted, 'hex', 'utf8');
     decrypted += decipher.final('utf8');
-    
+
     return decrypted;
   }
 }
@@ -79,14 +79,14 @@ export class CertificateUtils {
   static parseDN(dn: string): Record<string, string> {
     const parts: Record<string, string> = {};
     const components = dn.split(',');
-    
+
     for (const component of components) {
       const [key, value] = component.trim().split('=');
       if (key && value) {
         parts[key] = value;
       }
     }
-    
+
     return parts;
   }
 }
@@ -181,7 +181,7 @@ import * as pkijs from 'pkijs';
 export class CRLUtils {
   private static ensurePkijsEngine(): void {
     try {
-      const globalCrypto: any = (globalThis as any).crypto || (require('crypto') as any).webcrypto;
+      const globalCrypto: any = (globalThis as any).crypto || (crypto as any).webcrypto;
       if (!globalCrypto) return;
       const engine = new (pkijs as any).CryptoEngine({
         name: 'webcrypto',
@@ -235,7 +235,7 @@ export class CRLUtils {
     }
 
     // Add extensions
-    const extensions = [];
+    const extensions: any[] = [];
     extensions.push(new pkijs.Extension({
       extnID: "2.5.29.20", // cRLNumber
       critical: false,
@@ -246,9 +246,9 @@ export class CRLUtils {
     const authorityKeyIdentifierHashed = await crypto.digest({ name: "SHA-1" }, new Uint8Array(authorityKeyIdentifier));
 
     extensions.push(new pkijs.Extension({
-        extnID: "2.5.29.35", // authorityKeyIdentifier
-        critical: false,
-        extnValue: new pkijs.AuthorityKeyIdentifier({ keyIdentifier: new asn1js.OctetString({ valueHex: authorityKeyIdentifierHashed }) }).toSchema().toBER(false),
+      extnID: "2.5.29.35", // authorityKeyIdentifier
+      critical: false,
+      extnValue: new pkijs.AuthorityKeyIdentifier({ keyIdentifier: new asn1js.OctetString({ valueHex: authorityKeyIdentifierHashed }) }).toSchema().toBER(false),
     }));
 
     crl.crlExtensions = new pkijs.Extensions({ extensions });
@@ -301,26 +301,26 @@ export class CRLUtils {
       crl.revokedCertificates.push(revokedCertificate);
     }
 
-    const extensions = [];
+    const extensions: any[] = [];
     // Base CRL Number (critical for delta CRLs)
     extensions.push(new pkijs.Extension({
-        extnID: "2.5.29.20", // cRLNumber
-        critical: false,
-        extnValue: new asn1js.Integer({ value: baseCrlNumber }).toBER(false),
+      extnID: "2.5.29.20", // cRLNumber
+      critical: false,
+      extnValue: new asn1js.Integer({ value: baseCrlNumber }).toBER(false),
     }));
     // Delta CRL Indicator (critical)
     extensions.push(new pkijs.Extension({
-        extnID: "2.5.29.27", // deltaCRLIndicator
-        critical: true,
-        extnValue: new asn1js.Integer({ value: deltaCrlNumber }).toBER(false),
+      extnID: "2.5.29.27", // deltaCRLIndicator
+      critical: true,
+      extnValue: new asn1js.Integer({ value: deltaCrlNumber }).toBER(false),
     }));
 
     const authorityKeyIdentifier = caCert.subjectPublicKeyInfo.subjectPublicKey.valueBlock.valueHex;
     const authorityKeyIdentifierHashed = await crypto.digest({ name: "SHA-1" }, new Uint8Array(authorityKeyIdentifier));
     extensions.push(new pkijs.Extension({
-        extnID: "2.5.29.35", // authorityKeyIdentifier
-        critical: false,
-        extnValue: new pkijs.AuthorityKeyIdentifier({ keyIdentifier: new asn1js.OctetString({ valueHex: authorityKeyIdentifierHashed }) }).toSchema().toBER(false),
+      extnID: "2.5.29.35", // authorityKeyIdentifier
+      critical: false,
+      extnValue: new pkijs.AuthorityKeyIdentifier({ keyIdentifier: new asn1js.OctetString({ valueHex: authorityKeyIdentifierHashed }) }).toSchema().toBER(false),
     }));
 
     crl.crlExtensions = new pkijs.Extensions({ extensions });
@@ -359,12 +359,12 @@ export class X509Utils {
   ): { isValid: boolean; issues: string[]; chain: Array<{ cert: forge.pki.Certificate; status: string }> } {
     const issues: string[] = [];
     const chain: Array<{ cert: forge.pki.Certificate; status: string }> = [];
-    
+
     try {
       // Parse the certificate
       const cert = forge.pki.certificateFromPem(certificatePem);
       chain.push({ cert, status: 'valid' });
-      
+
       // Check certificate expiration if requested
       if (options.checkExpiration !== false) {
         const now = new Date();
@@ -375,19 +375,19 @@ export class X509Utils {
           issues.push(`Certificate has expired. Expired on: ${cert.validity.notAfter.toISOString().split('T')[0]}`);
         }
       }
-      
+
       // Validate certificate extensions for compliance
       const extensionValidation = this.validateExtensions(cert.extensions, false);
       if (!extensionValidation.isCompliant) {
         issues.push(...extensionValidation.issues);
       }
-      
+
       // Build and validate certificate chain
       const maxChainLength = options.maxChainLength || 10;
       let currentCert = cert;
       let chainLength = 0;
       let foundTrustedRoot = false;
-      
+
       while (chainLength < maxChainLength) {
         // Find issuer certificate
         const issuerCert = this.findIssuerCertificate(currentCert, caCertificates);
@@ -423,28 +423,28 @@ export class X509Utils {
           if (issuerValidation.issues.length > 0) {
             issues.push(...issuerValidation.issues);
           }
-          
+
           chain.push({ cert: issuerCert, status: 'valid' });
           currentCert = issuerCert;
         }
-        
+
         chainLength++;
       }
-      
+
       if (chainLength >= maxChainLength) {
         issues.push(`Certificate chain too long (max: ${maxChainLength})`);
       }
-      
+
       // Check if we require a trusted root and found one
       if (options.requireTrustedRoot && !foundTrustedRoot) {
         issues.push('Certificate chain does not lead to a trusted root CA');
       }
-      
+
     } catch (error) {
       // Avoid leaking internal forge errors - provide generic message
       issues.push('Failed to parse or validate the certificate. Please ensure it is a single valid PEM certificate.');
     }
-    
+
     return {
       isValid: issues.length === 0,
       issues,
@@ -460,12 +460,12 @@ export class X509Utils {
     try {
       // Check if this root CA is in our trusted store
       const rootFingerprint = this.generateCertificateFingerprint(rootCert);
-      
+
       for (const caCertPem of caCertificates) {
         try {
           const caCert = forge.pki.certificateFromPem(caCertPem);
           const caFingerprint = this.generateCertificateFingerprint(caCert);
-          
+
           if (rootFingerprint === caFingerprint) {
             return { isTrusted: true };
           }
@@ -473,19 +473,19 @@ export class X509Utils {
           continue;
         }
       }
-      
+
       // Check if it's a self-signed root with proper CA constraints
       if (this.isSelfSigned(rootCert)) {
         const basicConstraints = rootCert.getExtension('basicConstraints') as any;
         const keyUsage = rootCert.getExtension('keyUsage') as any;
-        
+
         if (basicConstraints?.cA && keyUsage?.keyCertSign) {
           return { isTrusted: true };
         } else {
           return { isTrusted: false, reason: 'Self-signed root lacks proper CA constraints' };
         }
       }
-      
+
       return { isTrusted: false, reason: 'Root CA not in trusted store and not properly self-signed' };
     } catch {
       return { isTrusted: false, reason: 'Failed to validate root CA' };
@@ -498,26 +498,26 @@ export class X509Utils {
     chainLevel: number
   ): { issues: string[] } {
     const issues: string[] = [];
-    
+
     try {
       // Check if issuer is a CA
       const basicConstraints: any = issuerCert.getExtension('basicConstraints');
       const isCA = basicConstraints?.cA ?? basicConstraints?.value?.cA ?? false;
-      
+
       if (!isCA) {
         const issuerCN = issuerCert.subject.getField('CN')?.value || 'Unknown';
         issues.push(`Issuer certificate is not a CA: ${issuerCN}`);
       }
-      
+
       // Check key usage
       const keyUsage: any = issuerCert.getExtension('keyUsage');
       const canSign = keyUsage?.keyCertSign ?? keyUsage?.value?.keyCertSign ?? false;
-      
+
       if (!canSign) {
         const issuerCN = issuerCert.subject.getField('CN')?.value || 'Unknown';
         issues.push(`Issuer certificate cannot sign other certificates: ${issuerCN}`);
       }
-      
+
       // Check path length constraint for intermediate CAs
       if (chainLevel > 0 && basicConstraints?.pathLenConstraint !== undefined) {
         if (basicConstraints.pathLenConstraint < 0) {
@@ -525,17 +525,17 @@ export class X509Utils {
           issues.push(`Issuer certificate has invalid path length constraint: ${issuerCN}`);
         }
       }
-      
+
       // Validate extensions for compliance
       const extensionValidation = this.validateExtensions(issuerCert.extensions, true);
       if (!extensionValidation.isCompliant) {
         issues.push(...extensionValidation.issues.map(issue => `Issuer ${issue}`));
       }
-      
+
     } catch {
       // Extension parsing failed, skip detailed validation
     }
-    
+
     return { issues };
   }
 
@@ -566,12 +566,12 @@ export class X509Utils {
     caCertificates: string[]
   ): forge.pki.Certificate | null {
     const issuerDN = certificate.issuer.getField('CN')?.value;
-    
+
     for (const caCertPem of caCertificates) {
       try {
         const caCert = forge.pki.certificateFromPem(caCertPem);
         const caSubjectDN = caCert.subject.getField('CN')?.value;
-        
+
         if (issuerDN === caSubjectDN) {
           return caCert;
         }
@@ -580,7 +580,7 @@ export class X509Utils {
         continue;
       }
     }
-    
+
     return null;
   }
 
@@ -608,10 +608,10 @@ export class X509Utils {
       const now = new Date();
       const validFrom = cert.validity.notBefore;
       const validTo = cert.validity.notAfter;
-      
+
       const expired = now > validTo;
       const daysUntilExpiry = Math.ceil((validTo.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-      
+
       return {
         expired,
         daysUntilExpiry: expired ? 0 : daysUntilExpiry,
@@ -639,16 +639,16 @@ export class X509Utils {
     try {
       const cert = forge.pki.certificateFromPem(certificatePem);
       const chain = this.validateCertificateChain(certificatePem, caCertificates, { checkExpiration: false });
-      
+
       const endEntity = cert.subject.getField('CN')?.value || 'Unknown';
       const intermediateCAs: string[] = [];
       let rootCA: string | null = null;
-      
+
       // Skip the first certificate (end entity)
       for (let i = 1; i < chain.chain.length; i++) {
         const chainCert = chain.chain[i].cert;
         const cn = chainCert.subject.getField('CN')?.value || 'Unknown';
-        
+
         if (i === chain.chain.length - 1) {
           // Last certificate in chain is the root CA
           rootCA = cn;
@@ -657,7 +657,7 @@ export class X509Utils {
           intermediateCAs.push(cn);
         }
       }
-      
+
       return {
         chainLength: chain.chain.length,
         isComplete: chain.isValid,
@@ -679,17 +679,17 @@ export class X509Utils {
   // Validate X.509 extensions for compliance
   static validateExtensions(extensions: any[], isCA: boolean): { isCompliant: boolean; issues: string[] } {
     const issues: string[] = [];
-    
+
     // Check for required extensions
     const requiredExtensions = ['basicConstraints', 'keyUsage', 'subjectKeyIdentifier', 'authorityKeyIdentifier'];
     const foundExtensions = extensions.map(ext => ext.name);
-    
+
     for (const required of requiredExtensions) {
       if (!foundExtensions.includes(required)) {
         issues.push(`Missing required extension: ${required}`);
       }
     }
-    
+
     // Validate Basic Constraints
     const basicConstraints = extensions.find(ext => ext.name === 'basicConstraints');
     if (basicConstraints) {
@@ -700,7 +700,7 @@ export class X509Utils {
         issues.push('Path length constraint must be non-negative');
       }
     }
-    
+
     // Validate Key Usage
     const keyUsage = extensions.find(ext => ext.name === 'keyUsage');
     if (keyUsage) {
@@ -714,19 +714,19 @@ export class X509Utils {
         issues.push('CA certificates must have cRLSign capability');
       }
     }
-    
+
     // Validate Policy Constraints (if present)
     const policyConstraints = extensions.find(ext => ext.name === 'policyConstraints');
     if (policyConstraints && isCA && !policyConstraints.critical) {
       issues.push('Policy Constraints must be critical for CA certificates');
     }
-    
+
     // Validate Name Constraints (if present)
     const nameConstraints = extensions.find(ext => ext.name === 'nameConstraints');
     if (nameConstraints && isCA && !nameConstraints.critical) {
       issues.push('Name Constraints must be critical for CA certificates');
     }
-    
+
     return {
       isCompliant: issues.length === 0,
       issues
@@ -760,7 +760,7 @@ export class X509Utils {
     const caPrivateKey = forge.pki.privateKeyFromPem(caPrivateKeyPem);
 
     const cert = forge.pki.createCertificate();
-    cert.publicKey = csr.publicKey;
+    cert.publicKey = csr.publicKey as forge.pki.PublicKey;
     cert.serialNumber = new forge.jsbn.BigInteger(serialHex, 16).toString(16);
 
     const now = new Date();
@@ -777,14 +777,14 @@ export class X509Utils {
     const extensions: any[] = [];
 
     // 1. Basic Constraints (CRITICAL for CA certificates)
-    const basicConstraints: any = { 
-      name: 'basicConstraints', 
+    const basicConstraints: any = {
+      name: 'basicConstraints',
       value: {
         cA: isCA,
       },
       critical: isCA // Critical for CA certificates
     };
-    
+
     // Add path length constraint for CA certificates
     if (isCA && opts?.pathLenConstraint !== undefined) {
       basicConstraints.value.pathLenConstraint = opts.pathLenConstraint;
@@ -792,7 +792,7 @@ export class X509Utils {
     extensions.push(basicConstraints);
 
     // 2. Key Usage (CRITICAL for CA certificates)
-    const keyUsage: any = { 
+    const keyUsage: any = {
       name: 'keyUsage',
       value: {},
       critical: isCA // Critical for CA certificates
@@ -817,17 +817,17 @@ export class X509Utils {
     extensions.push(keyUsage);
 
     // 3. Subject Key Identifier (Non-critical)
-    extensions.push({ 
-      name: 'subjectKeyIdentifier', 
+    extensions.push({
+      name: 'subjectKeyIdentifier',
       value: this.getSubjectKeyIdentifierFromCSR(csr),
-      critical: false 
+      critical: false
     });
 
     // 4. Authority Key Identifier (Non-critical)
-    extensions.push({ 
-      name: 'authorityKeyIdentifier', 
+    extensions.push({
+      name: 'authorityKeyIdentifier',
       value: { keyIdentifier: this.getSubjectKeyIdentifier(caCert) },
-      critical: false 
+      critical: false
     });
 
     // 5. Extended Key Usage (Non-critical, purpose-specific)
@@ -863,8 +863,8 @@ export class X509Utils {
         }
         return { type: 2, value } as any; // DNS name (supports wildcard like *.example.com)
       });
-      extensions.push({ 
-        name: 'subjectAltName', 
+      extensions.push({
+        name: 'subjectAltName',
         value: { altNames },
         critical: false
       });
@@ -876,10 +876,10 @@ export class X509Utils {
         policyIdentifier: policyOid,
         policyQualifiers: [] // Can be extended with policy qualifiers
       }));
-      extensions.push({ 
-        name: 'certificatePolicies', 
-        value: { policyIdentifiers }, 
-        critical: false 
+      extensions.push({
+        name: 'certificatePolicies',
+        value: { policyIdentifiers },
+        critical: false
       });
     }
 
@@ -903,14 +903,14 @@ export class X509Utils {
     // Include CRL DP only if it is a non-empty string (avoid undefined encoding issues)
     if (opts?.crlDistributionPointUrl && typeof opts.crlDistributionPointUrl === 'string' && opts.crlDistributionPointUrl.length > 0) {
       try {
-        extensions.push({ 
-          name: 'cRLDistributionPoints', 
+        extensions.push({
+          name: 'cRLDistributionPoints',
           value: [{
             distributionPoint: [{ type: 6, value: opts.crlDistributionPointUrl }],
           }],
           critical: false
         });
-      } catch {}
+      } catch { }
     }
 
     // 11. Authority Information Access (Non-critical) - REQUIRED for enterprise PKI
@@ -933,7 +933,7 @@ export class X509Utils {
           },
           critical: false
         });
-      } catch {}
+      } catch { }
     }
 
     // Attempt to set full extension set; fall back to minimal if encoding fails
@@ -956,7 +956,7 @@ export class X509Utils {
       cert.sign(caPrivateKey, forge.md.sha256.create());
     } catch {
       // As a last resort, strip extensions and sign
-      try { cert.setExtensions([] as any); } catch {}
+      try { cert.setExtensions([] as any); } catch { }
       cert.sign(caPrivateKey, forge.md.sha256.create());
     }
     return forge.pki.certificateToPem(cert);
@@ -983,10 +983,10 @@ export class X509Utils {
   // Verify certificate extensions compliance
   static verifyCertificateCompliance(certPem: string): { isCompliant: boolean; issues: string[] } {
     const cert = forge.pki.certificateFromPem(certPem);
-    const isCA = cert.extensions.some(ext => 
+    const isCA = cert.extensions.some(ext =>
       ext.name === 'basicConstraints' && ext.value && ext.value.cA
     );
-    
+
     return this.validateExtensions(cert.extensions, isCA);
   }
 
@@ -998,7 +998,7 @@ export class X509Utils {
       crlDistributionPointUrl?: string;
       ocspUrl?: string;
     }
-    ): string {
+  ): string {
     const csr = forge.pki.certificationRequestFromPem(csrPem);
     if (!csr.verify()) {
       throw new Error('Invalid CSR signature');
